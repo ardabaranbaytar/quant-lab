@@ -1,0 +1,4 @@
+# Alternative to the systemd timer (cronie / most Linux crons support CRON_TZ).
+# crontab -e, then paste:
+CRON_TZ=America/New_York
+30 16 * * 1-5  /bin/bash /opt/quant-lab/deploy/run_bot.sh

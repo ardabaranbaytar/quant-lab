@@ -1,0 +1,2 @@
+[bandit]
+exclude = ./.venv,./web,./.cache,./.pytest_cache,./.ruff_cache,./.mypy_cache

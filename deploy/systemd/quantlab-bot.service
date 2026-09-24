@@ -1,0 +1,17 @@
+# Install (as root), assuming the repo lives in /opt/quant-lab with its .venv and .env:
+#   cp deploy/systemd/quantlab-bot.* /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now quantlab-bot.timer
+#   systemctl list-timers quantlab-bot.timer      # next run
+#   journalctl -u quantlab-bot / tail logs/bot.log
+[Unit]
+Description=quant-lab paper-trading bot (one step)
+Wants=network-online.target
+After=network-online.target mysql.service
+
+[Service]
+Type=oneshot
+User=quantlab
+WorkingDirectory=/opt/quant-lab
+Environment=BOT_NAME=sp500-pairs
+ExecStart=/bin/bash /opt/quant-lab/deploy/run_bot.sh
+TimeoutStartSec=30min

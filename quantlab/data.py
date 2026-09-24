@@ -1,0 +1,70 @@
+"""Price data loading with a local parquet cache."""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Iterable
+from pathlib import Path
+
+import pandas as pd
+
+DEFAULT_CACHE_DIR = Path(".cache/prices")
+
+
+def _cache_path(tickers: list[str], start: str, end: str, cache_dir: Path) -> Path:
+    # MD5 only names a cache file; it is not used for any security purpose.
+    raw = f"{','.join(tickers)}|{start}|{end}".encode()
+    key = hashlib.md5(raw, usedforsecurity=False).hexdigest()[:16]
+    return cache_dir / f"{key}.parquet"
+
+
+def load_prices(
+    tickers: Iterable[str],
+    start: str,
+    end: str,
+    cache_dir: Path | str | None = DEFAULT_CACHE_DIR,
+) -> pd.DataFrame:
+    """Download split/dividend-adjusted close prices (dates x tickers).
+
+    Results are cached on disk so repeated research runs don't hit Yahoo again.
+    Pass ``cache_dir=None`` to disable caching.
+    """
+    tickers = sorted({t.upper() for t in tickers})
+    path = None
+    if cache_dir is not None:
+        path = _cache_path(tickers, start, end, Path(cache_dir))
+        if path.exists():
+            return pd.read_parquet(path)
+
+    import yfinance as yf
+
+    raw = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
+    if raw.empty:
+        raise ValueError(f"No price data returned for {tickers}")
+
+    prices = raw["Close"]
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame(tickers[0])
+    prices = prices.sort_index()
+    prices.index = pd.DatetimeIndex(prices.index).tz_localize(None)
+    prices.columns.name = None
+
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        prices.to_parquet(path)
+    return prices
+
+
+def clean_prices(prices: pd.DataFrame, min_coverage: float = 0.0) -> pd.DataFrame:
+    """Forward-fill gaps inside each ticker's life; optionally drop thin tickers.
+
+    Leading NaNs (before listing) and trailing NaNs (after delisting) are kept,
+    so strategies ignore a ticker until it lists and the engine can see when
+    it dies. ``min_coverage`` > 0 drops short-lived tickers — which itself
+    introduces survivorship bias, so it defaults to off.
+    """
+    from quantlab.engine import ffill_within_life
+
+    coverage = prices.notna().mean()
+    kept = prices.loc[:, coverage >= min_coverage]
+    return ffill_within_life(kept)

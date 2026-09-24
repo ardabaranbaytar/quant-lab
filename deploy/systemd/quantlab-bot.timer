@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the quant-lab paper bot after the New York close
+
+[Timer]
+# systemd >= 235 accepts a time zone, so DST is handled for us.
+# 16:30 New York = 23:30 Istanbul in summer, 00:30 in winter.
+OnCalendar=Mon..Fri 16:30 America/New_York
+# If the machine was off, run once at boot; the bot catches up missed days.
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,48 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Sanal Ortamlar
+.venv/
+venv/
+ENV/
+
+# Ortam Değişkenleri & Gizli Bilgiler
+.env
+.env.local
+*.pem
+*.key
+
+# Test, Cache & Lint
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Frontend & Build
+node_modules/
+dist/
+.next/
+
+# Veritabanı & Bot Yerel Çıktıları (Repoya girmemeli)
+*.sqlite
+*.sqlite3
+*.db
+/data/*.parquet
+/data/*.csv
+
+# İşletim Sistemi
+.DS_Store
+Thumbs.db
+
+# Bot çalışma logları
+logs/
