@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import inspect
 import math
+import os
+import threading
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -64,6 +66,19 @@ def get_session() -> Iterator[Session]:
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
+# Backtests and pair scans download prices and burn CPU. On a small public
+# server a couple at a time is the limit; extra requests get 429, not a queue.
+_HEAVY_JOBS = threading.BoundedSemaphore(int(os.getenv("QUANTLAB_MAX_HEAVY_JOBS", "2")))
+
+
+def heavy_slot() -> Iterator[None]:
+    if not _HEAVY_JOBS.acquire(blocking=False):
+        raise HTTPException(429, "Server busy: too many backtests running. Try again in a moment.")
+    try:
+        yield
+    finally:
+        _HEAVY_JOBS.release()
+
 
 def _strategy_params(fn) -> dict:
     sig = inspect.signature(fn)
@@ -120,7 +135,8 @@ def list_strategies() -> list[StrategyInfo]:
     ]
 
 
-@app.post("/backtests", response_model=BacktestDetail, status_code=201)
+@app.post("/backtests", response_model=BacktestDetail, status_code=201,
+          dependencies=[Depends(heavy_slot)])
 def create_backtest(req: BacktestRequest, session: SessionDep):
     fn = STRATEGIES.get(req.strategy)
     if fn is None:
@@ -169,7 +185,7 @@ def get_backtest(run_id: int, session: SessionDep):
     return _with_benchmark(session, run)
 
 
-@app.post("/research/pairs", response_model=PairScanResponse)
+@app.post("/research/pairs", response_model=PairScanResponse, dependencies=[Depends(heavy_slot)])
 def pair_scan(req: PairScanRequest, session: SessionDep):
     tickers = [t.upper() for t in req.tickers]
     prices = repo.get_prices(session, tickers, str(req.start), str(req.end), allow_missing=True)

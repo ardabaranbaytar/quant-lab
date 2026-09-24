@@ -1,0 +1,31 @@
+# Installed by deploy/setup_vps.sh as /etc/caddy/Caddyfile, with {$SITE}
+# replaced by your domain (automatic HTTPS) or ":80" (plain HTTP, no domain yet).
+{$SITE} {
+	encode zstd gzip
+
+	# API: strip the /api prefix and forward to uvicorn on localhost.
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# React build: unknown paths fall back to index.html (client-side routes).
+	handle {
+		root * /opt/quant-lab/web/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/quant-lab.log
+	}
+}

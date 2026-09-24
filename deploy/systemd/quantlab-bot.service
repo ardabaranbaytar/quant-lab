@@ -12,6 +12,7 @@ After=network-online.target mysql.service
 Type=oneshot
 User=quantlab
 WorkingDirectory=/opt/quant-lab
+Environment=XDG_CACHE_HOME=/opt/quant-lab/.cache
 Environment=BOT_NAME=sp500-pairs
 ExecStart=/bin/bash /opt/quant-lab/deploy/run_bot.sh
 TimeoutStartSec=30min

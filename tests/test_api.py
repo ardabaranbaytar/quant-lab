@@ -89,3 +89,19 @@ def test_pair_scan_ranks_cointegrated_pair_first(client):
 
 def test_missing_backtest_returns_404(client):
     assert client.get("/backtests/999").status_code == 404
+
+
+def test_heavy_endpoints_return_429_when_busy(client, monkeypatch):
+    import threading
+
+    import api.main
+
+    monkeypatch.setattr(api.main, "_HEAVY_JOBS", threading.BoundedSemaphore(1))
+    api.main._HEAVY_JOBS.acquire()  # one job already running
+    body = {"strategy": "buy_and_hold", "tickers": ["AAA"], "start": "2020-01-01", "end": "2021-12-31"}
+    assert client.post("/backtests", json=body).status_code == 429
+    assert client.post("/research/pairs", json={"tickers": ["PA", "PB"], "start": "2019-01-01",
+                                                "end": "2022-12-31"}).status_code == 429
+    assert client.get("/bots").status_code == 200  # read-only endpoints are never limited
+    api.main._HEAVY_JOBS.release()
+    assert client.post("/backtests", json=body).status_code == 201

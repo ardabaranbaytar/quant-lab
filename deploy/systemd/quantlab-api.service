@@ -1,0 +1,25 @@
+# FastAPI backend, reachable only through Caddy (bound to localhost).
+# Installed by deploy/setup_vps.sh.
+[Unit]
+Description=quant-lab API (FastAPI / uvicorn)
+Wants=network-online.target
+After=network-online.target mysql.service
+
+[Service]
+User=quantlab
+WorkingDirectory=/opt/quant-lab
+Environment=QUANTLAB_MAX_HEAVY_JOBS=1
+Environment=XDG_CACHE_HOME=/opt/quant-lab/.cache
+# --root-path: Caddy serves the API under /api, so /api/docs works.
+ExecStart=/opt/quant-lab/.venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 8000 --root-path /api --proxy-headers --workers 2
+Restart=on-failure
+RestartSec=5
+# Hardening: the app only needs to write its own cache and logs.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/quant-lab/.cache /opt/quant-lab/logs
+
+[Install]
+WantedBy=multi-user.target
