@@ -2,15 +2,17 @@
 # One-time setup of quant-lab on a fresh Ubuntu 24.04 server (e.g. Hetzner Cloud).
 #
 #   curl -fsSLO https://raw.githubusercontent.com/ardabaranbaytar/quant-lab/main/deploy/setup_vps.sh
-#   sudo bash setup_vps.sh example.com     # with a domain -> automatic HTTPS
-#   sudo bash setup_vps.sh                 # no domain yet -> plain HTTP on the server IP
+#   sudo bash setup_vps.sh                         # quant.ardabaranbaytar.com
+#   sudo bash setup_vps.sh quant.example.com       # another domain
 #
 # Installs MySQL (localhost only), Python venv, Node 22 (build only), Caddy,
-# the API service and the daily bot timer. Safe to re-run: existing
-# database credentials in /opt/quant-lab/.env are kept.
+# the API service and the daily bot timer. Shares the server with other apps:
+# Caddy loads every file in /etc/caddy/sites/ and this app only adds its own
+# (quant-lab.caddy). Safe to re-run: existing database credentials in
+# /opt/quant-lab/.env are kept.
 set -euo pipefail
 
-DOMAIN="${1:-}"
+DOMAIN="${1:-quant.ardabaranbaytar.com}"
 REPO="${REPO:-https://github.com/ardabaranbaytar/quant-lab.git}"
 APP=/opt/quant-lab
 USER_NAME=quantlab
@@ -40,7 +42,7 @@ if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 3000000 ] && ! swapon --
 fi
 
 step "Firewall: SSH, HTTP, HTTPS only"
-ufw allow OpenSSH >/dev/null
+ufw allow OpenSSH >/dev/null 2>&1 || ufw allow 22/tcp >/dev/null  # profile needs openssh-server
 ufw allow 80,443/tcp >/dev/null
 ufw --force enable
 
@@ -53,6 +55,7 @@ mkdir -p "$APP/.cache" "$APP/logs"
 chown -R "$USER_NAME:$USER_NAME" "$APP"
 
 step "MySQL database (listening on localhost only)"
+systemctl enable --now mysql
 if [ ! -f "$APP/.env" ]; then
   DB_PASS="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 32)"
   mysql <<SQL
@@ -81,15 +84,19 @@ cp "$APP"/deploy/systemd/quantlab-{api.service,bot.service,bot.timer} /etc/syste
 systemctl daemon-reload
 systemctl enable --now quantlab-api.service quantlab-bot.timer
 
-step "Caddy (${DOMAIN:-no domain: plain HTTP on :80})"
-sed "s|{\$SITE}|${DOMAIN:-:80}|" "$APP/deploy/caddy/Caddyfile" > /etc/caddy/Caddyfile
+step "Caddy site $DOMAIN"
+mkdir -p /etc/caddy/sites /var/log/caddy
+grep -qs '^import sites/\*.caddy' /etc/caddy/Caddyfile || cat > /etc/caddy/Caddyfile <<'CADDY'
+# Each app on this server drops its own site file into /etc/caddy/sites/.
+import sites/*.caddy
+CADDY
+sed "s|{\$SITE}|$DOMAIN|" "$APP/deploy/caddy/quant-lab.caddy" > /etc/caddy/sites/quant-lab.caddy
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl reload-or-restart caddy
 
-IP="$(curl -fsS -4 https://ifconfig.me || hostname -I | awk '{print $1}')"
 echo
 echo "Done."
-echo "  Dashboard:  ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
-echo "  API health: curl -s ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}/api/health"
+echo "  Dashboard:  https://$DOMAIN"
+echo "  API health: curl -s https://$DOMAIN/api/health"
 echo "  Bot timer:  systemctl list-timers quantlab-bot.timer"
 echo "  First bot step now (optional, ~1 min): sudo systemctl start quantlab-bot.service"

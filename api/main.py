@@ -53,7 +53,8 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="quant-lab API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Production is same-origin behind Caddy; this only matters for other front ends.
+    allow_origins=os.getenv("QUANTLAB_CORS_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

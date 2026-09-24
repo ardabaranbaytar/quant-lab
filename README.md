@@ -148,7 +148,7 @@ ruff check --fix . && bandit -r . -ll && mypy . && pytest
 cd web && npm install && npm run dev         # http://localhost:5173
 ```
 
-Deploying to a VPS (Caddy + systemd + MySQL, one script): [docs/deploy.md](docs/deploy.md).
+Deploying to a VPS next to the other apps under ardabaranbaytar.com (Caddy + systemd + MySQL, one script per app): [docs/deploy.md](docs/deploy.md).
 
 Tests use synthetic data only (no network) and include explicit look-ahead
 checks: perturbing future prices must never change past weights.

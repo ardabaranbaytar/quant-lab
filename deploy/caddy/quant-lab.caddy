@@ -1,5 +1,5 @@
-# Installed by deploy/setup_vps.sh as /etc/caddy/Caddyfile, with {$SITE}
-# replaced by your domain (automatic HTTPS) or ":80" (plain HTTP, no domain yet).
+# Installed by deploy/setup_vps.sh as /etc/caddy/sites/quant-lab.caddy, with the SITE placeholder
+# replaced by the domain (Caddy gets the HTTPS certificate itself).
 {$SITE} {
 	encode zstd gzip
 
