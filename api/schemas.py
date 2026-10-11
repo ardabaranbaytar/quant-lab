@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
+import math
+import re
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# The API is public, so request values are bounded here rather than trusted downstream.
+# Yahoo-style symbols: letters, digits and . - = ^  (BRK-B, ^GSPC, EURUSD=X); 16 = column width.
+_TICKER_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=]{0,15}$")
+MAX_SPAN_DAYS = 366 * 30
+MAX_PARAMS = 20
+MAX_PARAM_ABS = 10_000  # windows/thresholds: ~27 years of daily bars is far beyond any real use
+MAX_PARAM_TEXT = 16
+
+
+def _ticker(value: str) -> str:
+    symbol = value.strip().upper()
+    if not _TICKER_RE.fullmatch(symbol):
+        raise ValueError(f"invalid ticker symbol {symbol[:20]!r}")
+    return symbol
+
+
+def _check_span(start: date, end: date) -> None:
+    if (end - start).days > MAX_SPAN_DAYS:
+        raise ValueError("date range is longer than 30 years")
 
 
 class StrategyInfo(BaseModel):
@@ -28,7 +50,38 @@ class BacktestRequest(BaseModel):
     @field_validator("tickers")
     @classmethod
     def normalise_tickers(cls, v: list[str]) -> list[str]:
-        return list(dict.fromkeys(t.strip().upper() for t in v if t.strip()))
+        return list(dict.fromkeys(_ticker(t) for t in v if t.strip()))
+
+    @field_validator("benchmark")
+    @classmethod
+    def normalise_benchmark(cls, v: str | None) -> str | None:
+        return _ticker(v) if v and v.strip() else None
+
+    @field_validator("params")
+    @classmethod
+    def scalar_params(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if len(v) > MAX_PARAMS:
+            raise ValueError(f"at most {MAX_PARAMS} params")
+        for name, value in v.items():
+            if len(name) > 32:
+                raise ValueError("param name is too long")
+            if value is None or isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                if not math.isfinite(value) or abs(value) > MAX_PARAM_ABS:
+                    raise ValueError(f"param {name!r} is out of range")
+            elif isinstance(value, str):
+                if len(value) > MAX_PARAM_TEXT:
+                    raise ValueError(f"param {name!r} is too long")
+            else:
+                # ValueError on purpose: pydantic turns it into a 422, a TypeError would be a 500.
+                raise ValueError(f"param {name!r} must be a number, text or null")  # noqa: TRY004
+        return v
+
+    @model_validator(mode="after")
+    def limit_span(self) -> BacktestRequest:
+        _check_span(self.start, self.end)
+        return self
 
 
 class Point(BaseModel):
@@ -63,6 +116,16 @@ class PairScanRequest(BaseModel):
     tickers: list[str] = Field(min_length=2, max_length=40)
     start: date
     end: date
+
+    @field_validator("tickers")
+    @classmethod
+    def normalise_tickers(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(_ticker(t) for t in v))
+
+    @model_validator(mode="after")
+    def limit_span(self) -> PairScanRequest:
+        _check_span(self.start, self.end)
+        return self
 
 
 class PairScanRow(BaseModel):

@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -42,6 +42,10 @@ from quantlab.strategies import STRATEGIES
 
 MIN_TICKERS = {"pairs_trading": 2}
 INTERNAL_PARAMS = {"universe", "break_monitor"}  # set server-side, not user-editable
+
+# POST /backtests is anonymous and stores every run (one row per day of the curve), so only
+# the newest runs are kept. 0 disables pruning.
+MAX_STORED_RUNS = int(os.getenv("QUANTLAB_MAX_STORED_RUNS", "500"))
 
 
 @asynccontextmanager
@@ -170,11 +174,12 @@ def create_backtest(req: BacktestRequest, session: SessionDep):
         risk_free_rate=req.risk_free_rate,
         benchmark=req.benchmark,
     )
+    repo.prune_backtests(session, MAX_STORED_RUNS)
     return _with_benchmark(session, run)
 
 
 @app.get("/backtests", response_model=list[BacktestSummary])
-def list_backtests(session: SessionDep, limit: int = 50):
+def list_backtests(session: SessionDep, limit: Annotated[int, Query(ge=1, le=200)] = 50):
     return repo.list_backtests(session, limit)
 
 
@@ -233,12 +238,12 @@ def bot_equity(name: str, session: SessionDep):
 
 
 @app.get("/bots/{name}/fills", response_model=list[BotFill])
-def bot_fills(name: str, session: SessionDep, limit: int = 200):
+def bot_fills(name: str, session: SessionDep, limit: Annotated[int, Query(ge=1, le=1000)] = 200):
     _bot_or_404(session, name)
     return bot_store.fills(session, name, limit)
 
 
 @app.get("/bots/{name}/events", response_model=list[BotEventOut])
-def bot_events(name: str, session: SessionDep, limit: int = 200):
+def bot_events(name: str, session: SessionDep, limit: Annotated[int, Query(ge=1, le=1000)] = 200):
     _bot_or_404(session, name)
     return bot_store.events(session, name, limit)

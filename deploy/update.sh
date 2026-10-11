@@ -30,7 +30,15 @@ if [ -f /etc/systemd/system/quantlab-api.service ]; then
   cp "$APP"/deploy/systemd/quantlab-{api.service,bot.service,bot.timer} /etc/systemd/system/
   systemctl daemon-reload
   systemctl restart quantlab-api.service
-  sleep 2
-  curl -fsS http://127.0.0.1:8000/health >/dev/null
+  # Two uvicorn workers import pandas/statsmodels first: retry for up to ~30 s, not one fixed sleep.
+  for _ in $(seq 1 15); do
+    curl -fsS -o /dev/null http://127.0.0.1:8000/health 2>/dev/null && break
+    sleep 2
+  done
+  curl -fsS http://127.0.0.1:8000/health >/dev/null || {
+    echo "API did not become healthy within 30 s; recent log:" >&2
+    journalctl -u quantlab-api -n 20 --no-pager >&2 || true
+    exit 1
+  }
   echo "API healthy at $(as_app "git log -1 --format='%h %s'")"
 fi

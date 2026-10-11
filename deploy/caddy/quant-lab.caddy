@@ -5,6 +5,10 @@
 
 	# API: strip the /api prefix and forward to uvicorn on localhost.
 	handle_path /api/* {
+		# Every endpoint takes a small JSON body; refuse anything bigger before it reaches Python.
+		request_body {
+			max_size 1MB
+		}
 		reverse_proxy 127.0.0.1:8000
 	}
 
@@ -22,8 +26,23 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		X-Frame-Options DENY
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# No includeSubDomains/preload on purpose, same as the main site.
+		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
+
+	# Content-Security-Policy for the React app.
+	#  - script-src: the one inline script in web/index.html (theme before first paint) is allowed
+	#    by hash. If that script changes, recompute it:
+	#      curl -s https://<site>/ | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+	#        const m=/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/.exec(s);
+	#        console.log("sha256-"+require("crypto").createHash("sha256").update(m[1]).digest("base64"))})'
+	#  - style-src needs 'unsafe-inline' for the style attributes React/Recharts set;
+	#  - /api/docs and /api/redoc (Swagger UI / ReDoc) load their assets from a CDN: no CSP there.
+	@csp not path /api/docs /api/docs/* /api/redoc
+	header @csp Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-kUUArHGvW1UcJAVUGFoRym0LVRDta8mZfbMojLYRt84='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 	log {
 		output file /var/log/caddy/quant-lab.log

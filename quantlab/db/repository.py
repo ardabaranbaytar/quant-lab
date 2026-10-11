@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pandas as pd
 from sqlalchemy import delete, func, insert, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from quantlab.db.models import BacktestPoint, BacktestRun, Price
@@ -170,6 +171,27 @@ def save_backtest(
     session.add(run)
     session.flush()
     return run
+
+
+def prune_backtests(session: Session, keep: int) -> int:
+    """Delete the oldest runs beyond the newest ``keep`` (``keep <= 0`` keeps everything).
+
+    The public API stores every backtest it serves; without a cap anonymous traffic
+    would grow the database without bound. Returns the number of runs removed.
+    """
+    if keep <= 0:
+        return 0
+    cutoff = session.scalar(
+        select(BacktestRun.id).order_by(BacktestRun.id.desc()).offset(keep).limit(1)
+    )
+    if cutoff is None:
+        return 0
+    old_runs = select(BacktestRun.id).where(BacktestRun.id <= cutoff)
+    session.execute(delete(BacktestPoint).where(BacktestPoint.run_id.in_(old_runs)))
+    result = cast("CursorResult[Any]", session.execute(
+        delete(BacktestRun).where(BacktestRun.id <= cutoff)
+    ))
+    return result.rowcount
 
 
 def list_backtests(session: Session, limit: int = 50) -> list[BacktestRun]:

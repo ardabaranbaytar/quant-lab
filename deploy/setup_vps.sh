@@ -8,7 +8,8 @@
 # Installs MySQL (localhost only), Python venv, Node 22 (build only), Caddy,
 # the API service and the daily bot timer. Shares the server with other apps:
 # Caddy loads every file in /etc/caddy/sites/ and this app only adds its own
-# (quant-lab.caddy). Safe to re-run: existing database credentials in
+# (quant-lab.caddy); an existing /etc/caddy/Caddyfile is backed up and kept, only the
+# import line is appended. Safe to re-run: existing database credentials in
 # /opt/quant-lab/.env are kept.
 set -euo pipefail
 
@@ -86,12 +87,27 @@ systemctl enable --now quantlab-api.service quantlab-bot.timer
 
 step "Caddy site $DOMAIN"
 mkdir -p /etc/caddy/sites /var/log/caddy
-grep -qs '^import sites/\*.caddy' /etc/caddy/Caddyfile || cat > /etc/caddy/Caddyfile <<'CADDY'
+chown caddy:caddy /var/log/caddy
+CADDYFILE=/etc/caddy/Caddyfile
+if ! grep -qs '^import sites/\*.caddy' "$CADDYFILE"; then
+  if [ ! -s "$CADDYFILE" ] || grep -qs '/usr/share/caddy' "$CADDYFILE"; then
+    # Fresh server: replace the stock package Caddyfile (it only serves a welcome page).
+    cat > "$CADDYFILE" <<'CADDY'
 # Each app on this server drops its own site file into /etc/caddy/sites/.
 import sites/*.caddy
 CADDY
+  else
+    # Another app already owns this file (e.g. the website's site block): keep it, add the import.
+    cp "$CADDYFILE" "$CADDYFILE.bak-$(date +%F-%H%M)"
+    printf '\n# Each app on this server drops its own site file into /etc/caddy/sites/.\nimport sites/*.caddy\n' \
+      >> "$CADDYFILE"
+  fi
+fi
 sed "s|{\$SITE}|$DOMAIN|" "$APP/deploy/caddy/quant-lab.caddy" > /etc/caddy/sites/quant-lab.caddy
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+caddy validate --config "$CADDYFILE" --adapter caddyfile
+# `caddy validate` runs as root and creates the log files root-owned, but the service runs as
+# `caddy`: without this chown the reload fails with "permission denied" on the log file.
+chown -R caddy:caddy /var/log/caddy
 systemctl reload-or-restart caddy
 
 echo

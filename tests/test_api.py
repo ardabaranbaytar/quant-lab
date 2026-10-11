@@ -77,6 +77,51 @@ def test_backtest_validation_errors(client, patch, fragment):
     assert fragment in res.text
 
 
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"tickers": ["AAA; DROP TABLE prices"]},
+        {"tickers": ["A" * 40]},
+        {"benchmark": "../../etc/passwd"},
+        {"params": {"lookback": 10**9}},
+        {"params": {"lookback": 1e30}},
+        {"params": {"lookback": {"nested": 1}}},
+        {"params": {"lookback": [1, 2]}},
+        {"params": {f"p{i}": 1 for i in range(25)}},
+        {"start": "1900-01-01", "end": "2022-01-01"},
+    ],
+)
+def test_backtest_rejects_out_of_bounds_input(client, patch):
+    body = {"strategy": "ts_momentum", "tickers": ["AAA"], "start": "2020-01-01", "end": "2022-01-01"}
+    res = client.post("/backtests", json={**body, **patch})
+    assert res.status_code == 422, res.text
+    assert client.get("/backtests").json() == []  # nothing was stored
+
+
+def test_pair_scan_rejects_bad_tickers_and_span(client):
+    bad_ticker = {"tickers": ["PA", "x y"], "start": "2020-01-01", "end": "2022-01-01"}
+    assert client.post("/research/pairs", json=bad_ticker).status_code == 422
+    too_long = {"tickers": ["PA", "PB"], "start": "1900-01-01", "end": "2022-01-01"}
+    assert client.post("/research/pairs", json=too_long).status_code == 422
+
+
+def test_list_limits_are_bounded(client):
+    assert client.get("/backtests?limit=200").status_code == 200
+    assert client.get("/backtests?limit=201").status_code == 422
+    assert client.get("/backtests?limit=0").status_code == 422
+
+
+def test_stored_runs_are_pruned_to_the_newest(client, monkeypatch):
+    import api.main
+
+    monkeypatch.setattr(api.main, "MAX_STORED_RUNS", 2)
+    body = {"strategy": "buy_and_hold", "tickers": ["AAA"], "start": "2020-01-01", "end": "2021-12-31"}
+    ids = [client.post("/backtests", json=body).json()["id"] for _ in range(4)]
+    listed = [r["id"] for r in client.get("/backtests").json()]
+    assert listed == ids[:1:-1]  # newest two, newest first
+    assert client.get(f"/backtests/{ids[0]}").status_code == 404
+
+
 def test_pair_scan_ranks_cointegrated_pair_first(client):
     res = client.post(
         "/research/pairs",

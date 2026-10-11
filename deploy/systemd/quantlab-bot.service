@@ -16,3 +16,19 @@ Environment=XDG_CACHE_HOME=/opt/quant-lab/.cache
 Environment=BOT_NAME=sp500-pairs
 ExecStart=/bin/bash /opt/quant-lab/deploy/run_bot.sh
 TimeoutStartSec=30min
+# Hardening (same as the API): the bot only writes its cache and logs. Keeping the checkout
+# read-only also stops a compromised bot from editing deploy/ files that update.sh runs as root.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/quant-lab/.cache /opt/quant-lab/logs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryHigh=1200M
+MemoryMax=1800M
+TasksMax=256
