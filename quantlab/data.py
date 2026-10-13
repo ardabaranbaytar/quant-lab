@@ -10,12 +10,35 @@ import pandas as pd
 
 DEFAULT_CACHE_DIR = Path(".cache/prices")
 
+# yfinance starts one OS thread per ticker (its worker limit only throttles how many run at
+# once), so one call for the whole S&P 500 needs ~500 threads and dies with "can't start new
+# thread" under the bot unit's TasksMax=256. Downloading in batches keeps the peak well below it.
+YAHOO_BATCH = 100
+
 
 def _cache_path(tickers: list[str], start: str, end: str, cache_dir: Path) -> Path:
     # MD5 only names a cache file; it is not used for any security purpose.
     raw = f"{','.join(tickers)}|{start}|{end}".encode()
     key = hashlib.md5(raw, usedforsecurity=False).hexdigest()[:16]
     return cache_dir / f"{key}.parquet"
+
+
+def _download_close(tickers: list[str], start: str, end: str) -> pd.DataFrame:
+    import yfinance as yf
+
+    frames = []
+    for i in range(0, len(tickers), YAHOO_BATCH):
+        batch = tickers[i : i + YAHOO_BATCH]
+        raw = yf.download(batch, start=start, end=end, auto_adjust=True, progress=False)
+        if raw.empty:
+            continue
+        close = raw["Close"]
+        if isinstance(close, pd.Series):
+            close = close.to_frame(batch[0])
+        frames.append(close)
+    if not frames:
+        raise ValueError(f"No price data returned for {tickers}")
+    return pd.concat(frames, axis=1)
 
 
 def load_prices(
@@ -36,16 +59,7 @@ def load_prices(
         if path.exists():
             return pd.read_parquet(path)
 
-    import yfinance as yf
-
-    raw = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
-    if raw.empty:
-        raise ValueError(f"No price data returned for {tickers}")
-
-    prices = raw["Close"]
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(tickers[0])
-    prices = prices.sort_index()
+    prices = _download_close(tickers, start, end).sort_index()
     prices.index = pd.DatetimeIndex(prices.index).tz_localize(None)
     prices.columns.name = None
 
