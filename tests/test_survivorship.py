@@ -77,6 +77,21 @@ def test_delisted_leg_moves_to_cash_while_survivor_keeps_trading():
     res = run_backtest(px, w, cost_rate=0.0, delisting="total_loss")
     live_growth = px["LIVE"].iloc[-1] / px["LIVE"].iloc[0]
     assert res.equity.iloc[-1] == pytest.approx(0.5 * live_growth)
+    assert res.delistings["ticker"].tolist() == ["DEAD"]  # recorded although the policy is -100%
+
+
+def test_total_loss_wipeout_keeps_weights_finite():
+    # Everything held dies at -100% on the same day while LIVE is held at zero: nothing is left
+    # to hold, and 0/0 must not leak NaN weights/turnover into later days.
+    idx = pd.bdate_range("2020-01-01", periods=30)
+    px = pd.DataFrame({"DEAD": 10.0, "LIVE": np.linspace(10, 13, 30)}, index=idx)
+    px.loc[idx[10]:, "DEAD"] = np.nan
+    w = pd.DataFrame({"DEAD": 1.0, "LIVE": 0.0}, index=idx)
+    res = run_backtest(px, w, cost_rate=0.001, delisting="total_loss")
+    assert np.isfinite(res.weights.to_numpy()).all()
+    assert np.isfinite(res.turnover.to_numpy()).all()
+    assert res.equity.iloc[-1] == pytest.approx(0.0)
+    assert res.delistings["ticker"].tolist() == ["DEAD"]
 
 
 def test_momentum_only_picks_point_in_time_members(prices):

@@ -61,7 +61,8 @@ def _run(args: argparse.Namespace) -> None:
         print(f"{r.date.date()}  equity {r.equity:>12,.0f}  open pairs {r.open_pairs:2d}  "
               f"orders {len(r.orders):2d}  {evs}")
     if not reports:
-        print("nothing to do: no new closes since the last run")
+        print(f"up to date: no trading day to process after {first.date()} "
+              f"(last completed close: {end.date()}); weekends and holidays have no close")
 
 
 def _status(args: argparse.Namespace) -> None:

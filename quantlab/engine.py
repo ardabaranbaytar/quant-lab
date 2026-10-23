@@ -142,13 +142,15 @@ def run_backtest(
         if t > 0:
             port_ret = float(w @ rets[t])
             gross[t] = port_ret
-            # Weights drift with prices; cash (1 - sum w) earns zero.
-            w = w * (1 + rets[t]) / (1 + port_ret)
             dying = delist_row == t
-            if dying.any():
-                for i in np.flatnonzero(dying & (w != 0)):
-                    events.append((prices.index[t], prices.columns[int(i)], float(held[t - 1, i])))
-                w[dying] = 0.0  # residual value converts to cash
+            # Judge "was it held" before the drift: a -100% delisting drifts a weight to zero.
+            for i in np.flatnonzero(dying & (w != 0)):
+                events.append((prices.index[t], prices.columns[int(i)], float(held[t - 1, i])))
+            # Weights drift with prices; cash (1 - sum w) earns zero. If everything held was
+            # wiped out (growth <= 0) there is nothing to rescale: 0/0 would leak NaN weights.
+            growth = 1.0 + port_ret
+            w = w * (1 + rets[t]) / growth if growth > 0 else np.zeros(n_assets)
+            w[dying] = 0.0  # residual value converts to cash
         if rebalance[t]:
             desired = np.where(tradable[t], target_arr[t], 0.0)
             turnover[t] = np.abs(desired - w).sum()
