@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-
-const NAV = [
-  { to: '/', label: 'Backtest', end: true },
-  { to: '/history', label: 'History', end: false },
-  { to: '/pairs', label: 'Pair scanner', end: false },
-  { to: '/bots', label: 'Paper bot', end: false },
-]
+import { useI18n } from '../i18n/context'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
 function ThemeToggle() {
+  const { t } = useI18n()
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
   )
@@ -23,25 +19,34 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-ink-2 hover:text-ink"
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-ink-2 hover:text-ink"
+      aria-label={theme === 'dark' ? t.theme.toLight : t.theme.toDark}
     >
-      {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+      {theme === 'dark' ? t.theme.light : t.theme.dark}
     </button>
   )
 }
 
 export function Layout() {
+  const { t } = useI18n()
+  const nav = [
+    { to: '/', label: t.nav.backtest, end: true },
+    { to: '/history', label: t.nav.history, end: false },
+    { to: '/pairs', label: t.nav.pairs, end: false },
+    { to: '/bots', label: t.nav.bot, end: false },
+  ]
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-page/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3 sm:px-6">
-          <NavLink to="/" className="flex items-center gap-2 font-semibold text-ink">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+          <NavLink to="/" className="flex shrink-0 items-center gap-2 font-semibold whitespace-nowrap text-ink">
             <img src="/favicon.svg" alt="" className="h-6 w-6" />
             quant-lab
           </NavLink>
-          <nav className="flex gap-1 overflow-x-auto text-sm">
-            {NAV.map((n) => (
+          {/* Own row on phones so the three language buttons and the theme toggle never squeeze it. */}
+          <nav className="order-last flex w-full gap-1 overflow-x-auto text-sm sm:order-none sm:w-auto">
+            {nav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -65,6 +70,7 @@ export function Layout() {
             >
               GitHub
             </a>
+            <LanguageSwitcher />
             <ThemeToggle />
           </div>
         </div>
@@ -72,9 +78,7 @@ export function Layout() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <Outlet />
       </main>
-      <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs text-muted sm:px-6">
-        Research and education only — not investment advice. Data: Yahoo Finance.
-      </footer>
+      <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs text-muted sm:px-6">{t.footer}</footer>
     </div>
   )
 }

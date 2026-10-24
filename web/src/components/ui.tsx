@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { useI18n } from '../i18n/context'
+import { ApiError } from '../lib/api'
 
 export function Card({ title, action, children, className = '' }: {
   title?: ReactNode
@@ -69,20 +71,24 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   )
 }
 
-export function ErrorBanner({ message }: { message: string }) {
+/** Shows an API error; the two failures the UI knows by code are translated, anything else is the server's text. */
+export function ErrorBanner({ error }: { error: Error }) {
+  const { t } = useI18n()
+  const message = error instanceof ApiError && error.code ? t.errors[error.code] : error.message
   return (
     <div role="alert" className="rounded-lg border border-critical/40 bg-critical/10 px-4 py-3 text-sm text-ink">
-      <span className="font-semibold text-critical">Error · </span>
+      <span className="font-semibold text-critical">{t.common.error} · </span>
       {message}
     </div>
   )
 }
 
-export function Spinner({ label = 'Loading' }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const { t } = useI18n()
   return (
     <span className="inline-flex items-center gap-2 text-sm text-muted" role="status">
       <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-transparent" />
-      {label}
+      {label ?? t.common.loading}
     </span>
   )
 }

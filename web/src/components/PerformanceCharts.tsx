@@ -11,8 +11,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useI18n } from '../i18n/context'
 import type { Point } from '../lib/api'
-import { longDate, pct, shortDate, yearlyReturns } from '../lib/format'
+import { yearlyReturns } from '../lib/format'
 import { Card, Segmented } from './ui'
 
 export interface Series {
@@ -62,11 +63,12 @@ function ChartTooltip({ active, payload, label, series, format }: {
   series: Series[]
   format: (v: number) => string
 }) {
+  const { f } = useI18n()
   if (!active || !payload?.length || !label) return null
   const byKey = new Map(payload.map((p) => [p.dataKey, p.value]))
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1.5 font-medium text-ink">{longDate(label)}</div>
+      <div className="mb-1.5 font-medium text-ink">{f.longDate(label)}</div>
       {series.map((s) =>
         byKey.has(s.key) ? (
           <div key={s.key} className="flex items-center justify-between gap-4">
@@ -97,6 +99,7 @@ function Legend({ series }: { series: Series[] }) {
 }
 
 function YearlyTable({ series }: { series: Series[] }) {
+  const { t, f } = useI18n()
   const yearly = series.map((s) => yearlyReturns(s.points))
   const years = [...new Set(yearly.flatMap((m) => [...m.keys()]))].sort()
   return (
@@ -104,7 +107,7 @@ function YearlyTable({ series }: { series: Series[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
-            <th className="py-2 pr-4 font-medium">Year</th>
+            <th className="py-2 pr-4 font-medium">{t.charts.year}</th>
             {series.map((s) => (
               <th key={s.key} className="py-2 pr-4 text-right font-medium">{s.label}</th>
             ))}
@@ -118,7 +121,7 @@ function YearlyTable({ series }: { series: Series[] }) {
                 const v = m.get(y)
                 return (
                   <td key={series[i].key} className={`py-1.5 pr-4 text-right ${v == null ? 'text-muted' : v < 0 ? 'text-critical' : 'text-ink'}`}>
-                    {pct(v ?? null)}
+                    {f.pct(v ?? null)}
                   </td>
                 )
               })}
@@ -130,7 +133,8 @@ function YearlyTable({ series }: { series: Series[] }) {
   )
 }
 
-export function PerformanceCharts({ series, title = 'Performance' }: { series: Series[]; title?: string }) {
+export function PerformanceCharts({ series, title }: { series: Series[]; title?: string }) {
+  const { t, f } = useI18n()
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [logScale, setLogScale] = useState(false)
   const equity = useMemo(() => mergeSeries(series, 'equity'), [series])
@@ -162,18 +166,18 @@ export function PerformanceCharts({ series, title = 'Performance' }: { series: S
       )}
     />
   )
-  const growth = (v: number) => `${v.toFixed(2)}×  (${v >= 1 ? '+' : ''}${((v - 1) * 100).toFixed(1)}%)`
+  const growth = (v: number) => `${f.num(v)}×  (${f.signedPct(v - 1)})`
 
   return (
     <Card
-      title={title}
+      title={title ?? t.charts.performance}
       action={
         <Segmented
           value={view}
           onChange={setView}
           options={[
-            { value: 'chart', label: 'Chart' },
-            { value: 'table', label: 'Yearly table' },
+            { value: 'chart', label: t.charts.chart },
+            { value: 'table', label: t.charts.yearlyTable },
           ]}
         />
       }
@@ -186,11 +190,12 @@ export function PerformanceCharts({ series, title = 'Performance' }: { series: S
           <div>
             <div className="mb-1 flex items-center justify-between text-xs text-muted">
               <span>
-                Growth of $1{equity.length > 0 && ` · ${shortDate(equity[0].date)} – ${shortDate(equity[equity.length - 1].date)}`}
+                {t.charts.growthOf}
+                {equity.length > 0 && ` · ${f.shortDate(equity[0].date)} – ${f.shortDate(equity[equity.length - 1].date)}`}
               </span>
               <label className="flex items-center gap-1.5">
                 <input type="checkbox" className="!w-auto" checked={logScale} onChange={(e) => setLogScale(e.target.checked)} />
-                Log scale
+                {t.charts.logScale}
               </label>
             </div>
             <div className="h-72">
@@ -204,7 +209,7 @@ export function PerformanceCharts({ series, title = 'Performance' }: { series: S
                     scale={logScale ? 'log' : 'auto'}
                     domain={['auto', 'auto']}
                     allowDataOverflow={false}
-                    tickFormatter={(v: number) => `${v < 10 ? v.toFixed(1) : v.toFixed(0)}×`}
+                    tickFormatter={(v: number) => `${f.num(v, v < 10 ? 1 : 0)}×`}
                   />
                   <ReferenceLine y={1} stroke="var(--axis)" />
                   {tooltip(growth)}
@@ -226,7 +231,7 @@ export function PerformanceCharts({ series, title = 'Performance' }: { series: S
             </div>
           </div>
           <div>
-            <div className="mb-1 text-xs text-muted">Drawdown from peak</div>
+            <div className="mb-1 text-xs text-muted">{t.charts.drawdownFromPeak}</div>
             <div className="h-40">
               <ResponsiveContainer>
                 <AreaChart data={drawdown} syncId="perf" margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
@@ -237,9 +242,9 @@ export function PerformanceCharts({ series, title = 'Performance' }: { series: S
                     width={44}
                     ticks={ddTicks}
                     domain={[ddTicks[ddTicks.length - 1], 0]}
-                    tickFormatter={(v: number) => `${Math.round(v * 100)}%`}
+                    tickFormatter={(v: number) => f.pct(v, 0)}
                   />
-                  {tooltip((v) => pct(v))}
+                  {tooltip((v) => f.pct(v))}
                   {series.map((s) => (
                     <Area
                       key={s.key}

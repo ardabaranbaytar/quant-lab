@@ -146,7 +146,15 @@ export interface BotConfig {
   min_order_value: number
 }
 
-export class ApiError extends Error {}
+/** `code` marks the errors the UI shows in the visitor's language; other messages come from the server as-is. */
+export class ApiError extends Error {
+  code?: 'network' | 'busy'
+
+  constructor(message: string, code?: 'network' | 'busy') {
+    super(message)
+    this.code = code
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
@@ -156,9 +164,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
     })
   } catch {
-    throw new ApiError('Cannot reach the API. Is the backend running?')
+    throw new ApiError('Cannot reach the API. Is the backend running?', 'network')
   }
   if (!res.ok) {
+    // The proxy answers for a backend that is down; to the visitor that is the same as no connection.
+    if ([502, 503, 504].includes(res.status)) {
+      throw new ApiError('Cannot reach the API. Is the backend running?', 'network')
+    }
+    if (res.status === 429) throw new ApiError('Server busy', 'busy')
     let message = `${res.status} ${res.statusText}`
     try {
       const body = await res.json()

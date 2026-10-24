@@ -1,6 +1,6 @@
 import type { BotEquityPoint, BotEvent, BotStatus } from '../../lib/api'
-import { isRiskEvent, money, timeAgo } from '../../lib/bot'
-import { longDate, pct, signedPct } from '../../lib/format'
+import { useI18n } from '../../i18n/context'
+import { isRiskEvent, timeAgo } from '../../lib/bot'
 import { StatTile } from '../ui'
 
 export function StatusPanel({ status, equity, events }: {
@@ -8,6 +8,8 @@ export function StatusPanel({ status, equity, events }: {
   equity: BotEquityPoint[]
   events: BotEvent[]
 }) {
+  const { t, f } = useI18n()
+  const s = t.bot.status
   const cfg = status.config
   const last = equity.at(-1)
   const ret = last ? last.equity / cfg.capital - 1 : null
@@ -17,30 +19,30 @@ export function StatusPanel({ status, equity, events }: {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <StatTile
-        label="Equity"
-        value={money(last?.equity ?? cfg.capital)}
+        label={s.equity}
+        value={f.money(last?.equity ?? cfg.capital)}
         delta={ret}
-        deltaLabel={ret == null ? undefined : `${signedPct(ret, 2)} since start`}
+        deltaLabel={ret == null ? undefined : s.sinceStart(f.signedPct(ret, 2))}
       />
       <StatTile
-        label="Open pairs"
+        label={s.openPairs}
         value={`${status.open_pairs.length} / ${cfg.top_k}`}
-        deltaLabel={`${status.pairs.length} pairs in the current book`}
+        deltaLabel={s.pairsInBook(status.pairs.length)}
       />
       <StatTile
-        label="Gross exposure"
-        value={pct(last?.gross_exposure ?? 0)}
-        deltaLabel={`cash ${money(status.cash)}`}
+        label={s.grossExposure}
+        value={f.pct(last?.gross_exposure ?? 0)}
+        deltaLabel={s.cash(f.money(status.cash))}
       />
       <StatTile
-        label="Last bar"
-        value={status.last_date ? longDate(status.last_date) : '—'}
-        deltaLabel={status.updated_at ? `run ${timeAgo(status.updated_at)}` : undefined}
+        label={s.lastBar}
+        value={status.last_date ? f.longDate(status.last_date) : '—'}
+        deltaLabel={status.updated_at ? s.ran(timeAgo(status.updated_at, t.time)) : undefined}
       />
       <StatTile
-        label="Risk exits"
+        label={s.riskExits}
         value={String(forced)}
-        deltaLabel={`next re-selection in ${toReselect} trading day${toReselect === 1 ? '' : 's'}`}
+        deltaLabel={s.nextReselect(toReselect)}
       />
     </div>
   )

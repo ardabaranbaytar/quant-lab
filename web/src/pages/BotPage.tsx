@@ -8,6 +8,7 @@ import { FillsCard } from '../components/bot/FillsCard'
 import { OpenBookCard } from '../components/bot/OpenBookCard'
 import { StatusPanel } from '../components/bot/StatusPanel'
 import { Button, Card, ErrorBanner, Spinner } from '../components/ui'
+import { useI18n } from '../i18n/context'
 import {
   api,
   type BotEquityPoint,
@@ -16,7 +17,6 @@ import {
   type BotStatus,
   type BotSummary,
 } from '../lib/api'
-import { longDate } from '../lib/format'
 
 interface BotData {
   status: BotStatus
@@ -45,35 +45,34 @@ async function fetchBot(bot: string): Promise<BotData> {
 }
 
 function EmptyState() {
+  const { t } = useI18n()
   return (
     <Card>
       <div className="mx-auto max-w-xl space-y-3 py-8 text-center">
-        <h2 className="font-semibold text-ink">No paper bot yet</h2>
-        <p className="text-sm text-ink-2">
-          Bots are stepped by a scheduled job, not from the browser. Start one from the backend folder; it trades the
-          point-in-time S&amp;P 500 from the last completed close:
-        </p>
+        <h2 className="font-semibold text-ink">{t.bot.emptyTitle}</h2>
+        <p className="text-sm text-ink-2">{t.bot.emptyText}</p>
         <pre className="overflow-x-auto rounded-lg bg-surface-2 px-4 py-3 text-left text-xs text-ink">
           python -m quantlab.bot run --name sp500-pairs
         </pre>
-        <p className="text-xs text-muted">Re-run it after each US close (it skips days already processed).</p>
+        <p className="text-xs text-muted">{t.bot.emptyHint}</p>
       </div>
     </Card>
   )
 }
 
 export function BotPage() {
+  const { t, f } = useI18n()
   const { name } = useParams()
   const navigate = useNavigate()
   const [bots, setBots] = useState<BotSummary[] | null>(null)
   const [data, setData] = useState<BotData | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   const selected = name ?? bots?.[0]?.name
 
   useEffect(() => {
-    api.bots().then(setBots).catch((e: Error) => setError(e.message))
+    api.bots().then(setBots).catch(setError)
   }, [])
 
   useEffect(() => {
@@ -81,7 +80,7 @@ export function BotPage() {
     let cancelled = false // a slow response for a previous bot must not overwrite this one
     fetchBot(selected)
       .then((d) => !cancelled && (setData(d), setError(null)))
-      .catch((e: Error) => !cancelled && setError(e.message))
+      .catch((e: Error) => !cancelled && setError(e))
     return () => {
       cancelled = true
     }
@@ -94,13 +93,13 @@ export function BotPage() {
       setData(await fetchBot(selected))
       setError(null)
     } catch (e) {
-      setError((e as Error).message)
+      setError(e as Error)
     } finally {
       setLoading(false)
     }
   }
 
-  if (error && !data) return <ErrorBanner message={error} />
+  if (error && !data) return <ErrorBanner error={error} />
   if (!bots) return <Spinner />
   if (bots.length === 0) return <EmptyState />
 
@@ -111,19 +110,17 @@ export function BotPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-lg font-semibold text-ink">
-            Paper-trading bot
+            {t.bot.title}
             {data && (
-              <Badge tone={stale ? 'warning' : 'good'}>{stale ? `stale · ${stale} days` : 'up to date'}</Badge>
+              <Badge tone={stale ? 'warning' : 'good'}>{stale ? t.bot.stale(stale) : t.bot.upToDate}</Badge>
             )}
           </h1>
-          <p className="text-sm text-ink-2">
-            Multi-pair stat-arb run forward one close at a time against a simulated broker. Paper money only.
-          </p>
+          <p className="text-sm text-ink-2">{t.bot.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {bots.length > 1 && (
             <select
-              aria-label="Bot"
+              aria-label={t.bot.botSelect}
               value={selected}
               onChange={(e) => navigate(`/bots/${encodeURIComponent(e.target.value)}`)}
             >
@@ -133,15 +130,15 @@ export function BotPage() {
             </select>
           )}
           <Button variant="ghost" onClick={refresh} disabled={loading}>
-            {loading ? 'Refreshing…' : 'Refresh'}
+            {loading ? t.bot.refreshing : t.bot.refresh}
           </Button>
         </div>
       </div>
 
-      {error && <ErrorBanner message={error} />}
+      {error && <ErrorBanner error={error} />}
       {stale && data?.status.last_date && (
         <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
-          No new close since {longDate(data.status.last_date)}. Is the daily job running?
+          {t.bot.noNewClose(f.longDate(data.status.last_date))}
         </div>
       )}
 

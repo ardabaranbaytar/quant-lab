@@ -14,7 +14,7 @@ Portfolio-level backtesting, factor research and a statistical-arbitrage paper-t
 - [x] Research: rank IC, quantile spreads, pair scanning (cointegration, half-life)
 - [x] Walk-forward / out-of-sample validation
 - [x] MySQL storage + FastAPI
-- [x] React dashboard (backtest, run history & comparison, pair scanner)
+- [x] React dashboard (backtest, run history & comparison, pair scanner), in English, Turkish and German
 - [x] Point-in-time S&P 500 universe + delisting-aware engine
 - [x] Break lab: synthetic pairs with known breaks + 7-detector break monitor
 - [x] Real-world break case studies ([report](reports/case_studies.md))

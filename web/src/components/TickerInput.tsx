@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useI18n } from '../i18n/context'
 
 /** Chip-style ticker entry: type and press Enter, comma or space. */
 export function TickerInput({ value, onChange, max = 100 }: {
@@ -6,6 +7,7 @@ export function TickerInput({ value, onChange, max = 100 }: {
   onChange: (tickers: string[]) => void
   max?: number
 }) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState('')
 
   const commit = (raw: string) => {
@@ -17,14 +19,14 @@ export function TickerInput({ value, onChange, max = 100 }: {
 
   return (
     <div className="flex flex-wrap gap-1.5 rounded-lg border border-line bg-surface-2 p-1.5">
-      {value.map((t) => (
-        <span key={t} className="inline-flex items-center gap-1 rounded-md bg-surface px-2 py-0.5 text-xs font-medium text-ink">
-          {t}
+      {value.map((ticker) => (
+        <span key={ticker} className="inline-flex items-center gap-1 rounded-md bg-surface px-2 py-0.5 text-xs font-medium text-ink">
+          {ticker}
           <button
             type="button"
-            aria-label={`Remove ${t}`}
+            aria-label={t.common.removeTicker(ticker)}
             className="text-muted hover:text-critical"
-            onClick={() => onChange(value.filter((x) => x !== t))}
+            onClick={() => onChange(value.filter((x) => x !== ticker))}
           >
             ×
           </button>
@@ -46,9 +48,9 @@ export function TickerInput({ value, onChange, max = 100 }: {
           e.preventDefault()
           commit(e.clipboardData.getData('text'))
         }}
-        placeholder={value.length ? '' : 'e.g. AAPL, MSFT'}
+        placeholder={value.length ? '' : t.common.tickerExample}
         className="!w-auto min-w-24 flex-1 !border-0 !bg-transparent !p-1 !outline-none"
-        aria-label="Add ticker"
+        aria-label={t.common.addTicker}
       />
     </div>
   )
