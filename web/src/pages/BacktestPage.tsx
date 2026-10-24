@@ -60,16 +60,17 @@ export function BacktestPage() {
     setTickers(p.tickers)
   }
 
-  const run = async () => {
+  /** `from` runs a preset right away; the form state it just set has not been rendered yet. */
+  const run = async (from?: { strategy: string; tickers: string[]; params: Record<string, ParamValue> }) => {
     setLoading(true)
     setError(null)
     try {
       // Blank fields fall back to the server-side defaults.
-      const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== null && v !== ''))
+      const clean = Object.fromEntries(Object.entries(from?.params ?? params).filter(([, v]) => v !== null && v !== ''))
       setResult(
         await api.runBacktest({
-          strategy,
-          tickers,
+          strategy: from?.strategy ?? strategy,
+          tickers: from?.tickers ?? tickers,
           start,
           end,
           params: clean,
@@ -85,10 +86,15 @@ export function BacktestPage() {
     }
   }
 
+  const launchPreset = (p: (typeof PRESETS)[number]) => {
+    applyPreset(p)
+    void run({ strategy: p.strategy, tickers: p.tickers, params: { ...strategies.find((s) => s.name === p.strategy)?.params } })
+  }
+
   const tooFew = info ? tickers.length < info.min_tickers : tickers.length === 0
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]">
       <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
         <Card title={t.backtest.configure}>
           <div className="space-y-4">
@@ -178,14 +184,14 @@ export function BacktestPage() {
               {t.backtest.compareSpy}
             </label>
 
-            <Button className="w-full" onClick={run} disabled={loading || tooFew}>
+            <Button className="w-full" onClick={() => run()} disabled={loading || tooFew}>
               {loading ? t.backtest.running : t.backtest.run}
             </Button>
           </div>
         </Card>
       </aside>
 
-      <section className="min-w-0 space-y-4">
+      <section className="@container min-w-0 space-y-4">
         {error && <ErrorBanner error={error} />}
         {loading && !result && (
           <Card>
@@ -198,12 +204,50 @@ export function BacktestPage() {
           </div>
         ) : (
           !loading && (
-            <Card>
-              <div className="py-16 text-center">
-                <h1 className="text-xl font-semibold text-ink">{t.backtest.emptyTitle}</h1>
-                <p className="mx-auto mt-2 max-w-md text-sm text-ink-2">{t.backtest.emptyText}</p>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold text-ink">{t.backtest.emptyTitle}</h1>
+                <p className="mt-1.5 text-sm text-ink-2">{t.backtest.emptyText}</p>
               </div>
-            </Card>
+
+              <div className="grid gap-4 @3xl:grid-cols-2">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => launchPreset(p)}
+                    className="group flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 text-left transition hover:border-accent"
+                  >
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="font-semibold text-ink">{t.backtest.presets[p.id]}</span>
+                      <span className="shrink-0 text-xs text-accent opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                        {t.backtest.runPreset}
+                      </span>
+                    </span>
+                    <span className="text-sm text-ink-2">{t.backtest.presetText[p.id]}</span>
+                    <span className="mt-auto flex flex-wrap gap-1.5 pt-1">
+                      {p.tickers.slice(0, 7).map((tk) => (
+                        <span key={tk} className="rounded-md bg-surface-2 px-1.5 py-0.5 text-xs text-ink-2">
+                          {tk}
+                        </span>
+                      ))}
+                      {p.tickers.length > 7 && (
+                        <span className="px-1 py-0.5 text-xs text-muted">+{p.tickers.length - 7}</span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <ul className="grid gap-4 border-t border-line pt-5 @3xl:grid-cols-3">
+                {t.backtest.principles.map((item) => (
+                  <li key={item.title}>
+                    <p className="text-sm font-medium text-ink">{item.title}</p>
+                    <p className="mt-0.5 text-sm text-muted">{item.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )
         )}
       </section>

@@ -121,8 +121,19 @@ export const en = {
     running: 'Running…',
     fetching: 'Fetching prices and running the backtest…',
     emptyTitle: 'Backtest a strategy',
-    emptyText:
-      'Pick a preset or configure a strategy on the left. Prices are cached in MySQL, signals use only information available at each close, and costs are charged on actual turnover.',
+    emptyText: 'Start from a preset below, or build your own strategy on the left.',
+    presetText: {
+      spyTrend: 'Hold SPY while its 60-day return is positive.',
+      megaCap: 'Each month, hold the 5 strongest of 15 US mega-caps.',
+      pairs: 'Trade the Visa / Mastercard price gap when it stretches.',
+      sectorEtfs: 'Buy sector ETFs trading 5% below their 20-day average.',
+    },
+    runPreset: 'Run →',
+    principles: [
+      { title: 'No look-ahead', text: 'Signals only use what was known at each close.' },
+      { title: 'Costs included', text: 'Trading costs are charged on actual turnover.' },
+      { title: 'Prices cached', text: 'Downloaded once, then stored in MySQL.' },
+    ] as { title: string; text: string }[],
   },
 
   result: {

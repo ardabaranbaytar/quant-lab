@@ -107,8 +107,19 @@ export const de: Messages = {
     running: 'Läuft…',
     fetching: 'Kurse werden geladen und der Backtest läuft…',
     emptyTitle: 'Eine Strategie testen',
-    emptyText:
-      'Wählen Sie links eine Vorlage oder konfigurieren Sie eine Strategie. Kurse werden in MySQL zwischengespeichert, Signale nutzen nur Informationen, die zum jeweiligen Schlusskurs bekannt sind, und Kosten fallen auf den tatsächlichen Umschlag an.',
+    emptyText: 'Starten Sie mit einer Vorlage unten oder bauen Sie links eine eigene Strategie.',
+    presetText: {
+      spyTrend: 'SPY halten, solange die 60-Tage-Rendite positiv ist.',
+      megaCap: 'Jeden Monat die 5 stärksten von 15 US-Großkonzernen halten.',
+      pairs: 'Die Preisdifferenz zwischen Visa und Mastercard handeln, wenn sie sich weitet.',
+      sectorEtfs: 'Sektor-ETFs kaufen, die 5 % unter ihrem 20-Tage-Durchschnitt notieren.',
+    },
+    runPreset: 'Starten →',
+    principles: [
+      { title: 'Kein Look-ahead', text: 'Signale nutzen nur, was zum jeweiligen Schlusskurs bekannt war.' },
+      { title: 'Kosten inklusive', text: 'Handelskosten werden auf den tatsächlichen Umschlag berechnet.' },
+      { title: 'Kurse zwischengespeichert', text: 'Einmal geladen, danach in MySQL gespeichert.' },
+    ],
   },
 
   result: {
@@ -132,7 +143,7 @@ export const de: Messages = {
     chart: 'Diagramm',
     yearlyTable: 'Jahrestabelle',
     year: 'Jahr',
-    growthOf: 'Wachstum von 1 $',
+    growthOf: 'Entwicklung von 1 $',
     logScale: 'Logarithmische Skala',
     drawdownFromPeak: 'Rückgang vom Höchststand',
   },
@@ -187,13 +198,13 @@ export const de: Messages = {
   bot: {
     emptyTitle: 'Noch kein Paper-Bot',
     emptyText:
-      'Bots werden von einem geplanten Job weitergeschaltet, nicht vom Browser aus. Starten Sie einen im Backend-Ordner; er handelt den Point-in-Time-S&P-500 ab dem letzten abgeschlossenen Schlusskurs:',
+      'Bots werden von einem geplanten Job weitergeschaltet, nicht vom Browser aus. Starten Sie einen im Backend-Ordner; er handelt den S&P 500 in der jeweils damaligen Zusammensetzung ab dem letzten abgeschlossenen Schlusskurs:',
     emptyHint: 'Nach jedem US-Handelsschluss erneut ausführen (bereits verarbeitete Tage werden übersprungen).',
     title: 'Paper-Trading-Bot',
     upToDate: 'aktuell',
     stale: (days) => `veraltet · ${days} Tage`,
     subtitle:
-      'Multi-Paar-Stat-Arb, Schlusskurs für Schlusskurs gegen einen simulierten Broker vorwärts gerechnet. Nur Spielgeld.',
+      'Statistische Arbitrage mit mehreren Paaren, Schlusskurs für Schlusskurs gegen einen simulierten Broker vorwärts gerechnet. Nur Spielgeld.',
     botSelect: 'Bot',
     refresh: 'Aktualisieren',
     refreshing: 'Aktualisiert…',
@@ -242,7 +253,7 @@ export const de: Messages = {
       breakMonitorOn: (votes, of) => `Break-Monitor an · ${votes}/${of} Stimmen`,
       breakMonitorOff: 'Break-Monitor aus',
       universe: 'Universum',
-      universeValue: (n) => `${n} Ticker · Point-in-Time-S&P-500`,
+      universeValue: (n) => `${n} Ticker · S&P 500 in damaliger Zusammensetzung`,
       pairing: 'Paarbildung',
       pairingValue: 'Gleiche GICS-Subbranche, Engle-Granger auf Log-Preisen',
       selection: 'Auswahl',

@@ -61,7 +61,7 @@ export function EventsCard({ events }: { events: BotEvent[] }) {
                   className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md px-2 py-2 text-sm ${risky ? 'bg-critical/10' : ''}`}
                 >
                   <span className="tabular w-28 shrink-0 text-ink-2">{f.longDate(e.date)}</span>
-                  <span className="w-32 shrink-0">
+                  <span className="w-44 shrink-0">
                     <Badge tone={meta.tone} title={kind?.hint}>{kind?.label ?? e.event}</Badge>
                   </span>
                   <span className="font-medium text-ink">{e.pair === '*' ? t.bot.events.allPairs : e.pair}</span>

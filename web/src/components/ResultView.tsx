@@ -21,7 +21,7 @@ export function ResultView({ run, showPermalink = true }: { run: BacktestDetail;
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="@container space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-ink">
@@ -72,28 +72,31 @@ export function ResultView({ run, showPermalink = true }: { run: BacktestDetail;
         />
       </div>
 
-      <PerformanceCharts series={series} />
+      {/* Wide: charts on the left, the metrics table beside them instead of far below. */}
+      <div className="grid items-start gap-5 @6xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <PerformanceCharts series={series} />
 
-      <Card title={t.result.allMetrics}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs text-muted">
-              <th className="py-2 font-medium">{t.result.metric}</th>
-              <th className="py-2 text-right font-medium">{t.result.strategy}</th>
-              {b && <th className="py-2 text-right font-medium">SPY</th>}
-            </tr>
-          </thead>
-          <tbody className="tabular">
-            {METRICS.filter((x) => x.key in m).map((x) => (
-              <tr key={x.key} className="border-b border-line/50 last:border-0">
-                <td className="py-1.5 text-ink-2">{t.metrics[x.key] ?? x.key}</td>
-                <td className="py-1.5 text-right text-ink">{f.metric(x.kind, m[x.key])}</td>
-                {b && <td className="py-1.5 text-right text-ink-2">{x.key in b ? f.metric(x.kind, b[x.key]) : '—'}</td>}
+        <Card title={t.result.allMetrics}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-xs text-muted">
+                <th className="py-2 font-medium">{t.result.metric}</th>
+                <th className="py-2 text-right font-medium">{t.result.strategy}</th>
+                {b && <th className="py-2 text-right font-medium">SPY</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+            </thead>
+            <tbody className="tabular">
+              {METRICS.filter((x) => x.key in m).map((x) => (
+                <tr key={x.key} className="border-b border-line/50 last:border-0">
+                  <td className="py-1.5 text-ink-2">{t.metrics[x.key] ?? x.key}</td>
+                  <td className="py-1.5 text-right text-ink">{f.metric(x.kind, m[x.key])}</td>
+                  {b && <td className="py-1.5 text-right text-ink-2">{x.key in b ? f.metric(x.kind, b[x.key]) : '—'}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </div>
     </div>
   )
 }

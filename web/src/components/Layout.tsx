@@ -39,7 +39,9 @@ export function Layout() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-page/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+          <LanguageSwitcher />
+          <span aria-hidden className="hidden h-5 w-px bg-line sm:block" />
           <NavLink to="/" className="flex shrink-0 items-center gap-2 font-semibold whitespace-nowrap text-ink">
             <img src="/favicon.svg" alt="" className="h-6 w-6" />
             quant-lab
@@ -70,15 +72,14 @@ export function Layout() {
             >
               GitHub
             </a>
-            <LanguageSwitcher />
             <ThemeToggle />
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-[112rem] px-4 py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
-      <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs text-muted sm:px-6">{t.footer}</footer>
+      <footer className="mx-auto max-w-[112rem] px-4 pb-8 text-xs text-muted sm:px-6 lg:px-8">{t.footer}</footer>
     </div>
   )
 }

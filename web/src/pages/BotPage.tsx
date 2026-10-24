@@ -106,7 +106,7 @@ export function BotPage() {
   const stale = data && staleness(data.status.last_date)
 
   return (
-    <div className="space-y-5">
+    <div className="@container space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-lg font-semibold text-ink">
@@ -152,8 +152,11 @@ export function BotPage() {
             <OpenBookCard status={data.status} />
             <ConfigCard config={data.status.config} />
           </div>
-          <EventsCard events={data.events} />
-          <FillsCard fills={data.fills} />
+          {/* Wide: the two long lists sit side by side instead of one under the other. */}
+          <div className="grid items-start gap-5 @6xl:grid-cols-2">
+            <EventsCard events={data.events} />
+            <FillsCard fills={data.fills} />
+          </div>
         </>
       )}
     </div>
