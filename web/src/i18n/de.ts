@@ -161,6 +161,20 @@ export const de: Messages = {
     maxDd: 'Max. DD',
     compareRun: (id) => `Lauf ${id} vergleichen`,
     allRuns: '← Alle Läufe',
+    admin: {
+      open: 'Admin',
+      keyLabel: 'Admin-Schlüssel',
+      unlock: 'Entsperren',
+      wrongKey: 'Der Schlüssel ist falsch.',
+      signOut: 'Abmelden',
+      delete: 'Löschen',
+      deleteRun: (id) => `Lauf ${id} löschen`,
+      deleteAll: 'Alle löschen',
+      confirmAll: 'Alle gespeicherten Läufe löschen?',
+      confirmYes: 'Ja, löschen',
+      cancel: 'Abbrechen',
+      rejected: 'Der Schlüssel wurde abgelehnt. Bitte erneut anmelden.',
+    },
   },
 
   pairs: {

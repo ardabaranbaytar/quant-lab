@@ -112,6 +112,20 @@ scp bot.sql root@<server-ip>:/tmp/
 mysql quantlab < /tmp/bot.sql && rm /tmp/bot.sql
 ```
 
+## Deleting saved backtests
+
+History is shared by all visitors, so deleting is locked behind a key only you know. On the server:
+
+```bash
+echo "QUANTLAB_ADMIN_TOKEN=$(openssl rand -hex 24)" >> /opt/quant-lab/.env
+grep QUANTLAB_ADMIN_TOKEN /opt/quant-lab/.env     # shows the key: copy it
+systemctl restart quantlab-api
+```
+
+Then open the History page, press **Admin** and paste the key once; the browser remembers it
+(**Sign out** forgets it). Without the setting the buttons never appear and the delete endpoint
+answers 404. To change the key, replace the line in `.env` and restart the service.
+
 ## Public API limits
 
 `POST /backtests` and `POST /research/pairs` download prices and use CPU, so each API

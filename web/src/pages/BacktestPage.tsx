@@ -94,8 +94,18 @@ export function BacktestPage() {
   const tooFew = info ? tickers.length < info.min_tickers : tickers.length === 0
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]">
-      <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+    <div className="grid gap-x-6 gap-y-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] 2xl:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+        <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+          <span className="text-xs font-medium text-ink-2">{t.common.tickers}</span>
+          {info && info.min_tickers > 1 && (
+            <span className="text-xs text-muted">{t.backtest.needsAtLeast(info.min_tickers)}</span>
+          )}
+        </div>
+        <TickerInput value={tickers} onChange={setTickers} />
+      </div>
+
+      <aside className="space-y-4 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-20 lg:self-start">
         <Card title={t.backtest.configure}>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
@@ -118,13 +128,6 @@ export function BacktestPage() {
                   </option>
                 ))}
               </select>
-            </Field>
-
-            <Field
-              label={t.common.tickers}
-              hint={info && info.min_tickers > 1 ? t.backtest.needsAtLeast(info.min_tickers) : undefined}
-            >
-              <TickerInput value={tickers} onChange={setTickers} />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
@@ -150,8 +153,8 @@ export function BacktestPage() {
                           onChange={(e) => setParams({ ...params, [name]: e.target.value || null })}
                         >
                           <option value="">{t.backtest.auto}</option>
-                          {tickers.map((t) => (
-                            <option key={t}>{t}</option>
+                          {tickers.map((tk) => (
+                            <option key={tk}>{tk}</option>
                           ))}
                         </select>
                       ) : (
@@ -191,7 +194,7 @@ export function BacktestPage() {
         </Card>
       </aside>
 
-      <section className="@container min-w-0 space-y-4">
+      <section className="@container min-w-0 space-y-4 lg:col-start-2 lg:row-start-2">
         {error && <ErrorBanner error={error} />}
         {loading && !result && (
           <Card>

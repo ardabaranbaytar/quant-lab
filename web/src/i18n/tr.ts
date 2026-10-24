@@ -160,6 +160,20 @@ export const tr: Messages = {
     maxDd: 'Maks. düşüş',
     compareRun: (id) => `${id} numaralı kaydı karşılaştır`,
     allRuns: '← Tüm kayıtlar',
+    admin: {
+      open: 'Yönetici',
+      keyLabel: 'Yönetici anahtarı',
+      unlock: 'Kilidi aç',
+      wrongKey: 'Anahtar yanlış.',
+      signOut: 'Çıkış yap',
+      delete: 'Sil',
+      deleteRun: (id) => `${id} numaralı kaydı sil`,
+      deleteAll: 'Tümünü sil',
+      confirmAll: 'Kayıtlı tüm testler silinsin mi?',
+      confirmYes: 'Evet, sil',
+      cancel: 'Vazgeç',
+      rejected: 'Anahtar kabul edilmedi. Yeniden giriş yapın.',
+    },
   },
 
   pairs: {

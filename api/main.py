@@ -5,6 +5,7 @@ Run locally:  uvicorn api.main:app --reload
 
 from __future__ import annotations
 
+import hmac
 import inspect
 import math
 import os
@@ -14,11 +15,12 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from api.schemas import (
+    AdminSession,
     BacktestDetail,
     BacktestRequest,
     BacktestSummary,
@@ -27,6 +29,8 @@ from api.schemas import (
     BotFill,
     BotStatus,
     BotSummary,
+    DeleteBacktestsRequest,
+    DeleteResult,
     PairScanRequest,
     PairScanResponse,
     Point,
@@ -46,6 +50,10 @@ INTERNAL_PARAMS = {"universe", "break_monitor"}  # set server-side, not user-edi
 # POST /backtests is anonymous and stores every run (one row per day of the curve), so only
 # the newest runs are kept. 0 disables pruning.
 MAX_STORED_RUNS = int(os.getenv("QUANTLAB_MAX_STORED_RUNS", "500"))
+
+# Deleting history is for the owner only: a key in the server's .env (QUANTLAB_ADMIN_TOKEN) that the
+# History page sends as X-Admin-Token. No key, or one shorter than this, switches the feature off.
+MIN_ADMIN_KEY_LENGTH = 24
 
 
 @asynccontextmanager
@@ -176,6 +184,36 @@ def create_backtest(req: BacktestRequest, session: SessionDep):
     )
     repo.prune_backtests(session, MAX_STORED_RUNS)
     return _with_benchmark(session, run)
+
+
+def _admin_key() -> str | None:
+    key = os.getenv("QUANTLAB_ADMIN_TOKEN", "")
+    return key if len(key) >= MIN_ADMIN_KEY_LENGTH else None
+
+
+def _is_admin(sent: str | None) -> bool:
+    key = _admin_key()
+    return bool(key and sent and hmac.compare_digest(sent.encode(), key.encode()))
+
+
+AdminKeyHeader = Annotated[str | None, Header(alias="X-Admin-Token")]
+
+
+def require_admin(sent: AdminKeyHeader = None) -> None:
+    if _admin_key() is None:
+        raise HTTPException(404, "Not found")
+    if not _is_admin(sent):
+        raise HTTPException(401, "Invalid admin key")
+
+
+@app.get("/admin/session", response_model=AdminSession)
+def admin_session(sent: AdminKeyHeader = None):
+    return AdminSession(enabled=_admin_key() is not None, authorized=_is_admin(sent))
+
+
+@app.post("/admin/backtests/delete", response_model=DeleteResult, dependencies=[Depends(require_admin)])
+def delete_backtests(req: DeleteBacktestsRequest, session: SessionDep):
+    return DeleteResult(deleted=repo.delete_backtests(session, None if req.delete_all else req.ids))
 
 
 @app.get("/backtests", response_model=list[BacktestSummary])

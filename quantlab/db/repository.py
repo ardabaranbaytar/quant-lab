@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, cast
 
 import pandas as pd
@@ -191,6 +191,22 @@ def prune_backtests(session: Session, keep: int) -> int:
     result = cast("CursorResult[Any]", session.execute(
         delete(BacktestRun).where(BacktestRun.id <= cutoff)
     ))
+    return result.rowcount
+
+
+def delete_backtests(session: Session, ids: Sequence[int] | None = None) -> int:
+    """Delete the given runs with their curves, or every run when ``ids`` is None.
+
+    Returns the number of runs removed. Curves go first so the delete also works on engines
+    that do not enforce ``ON DELETE CASCADE`` (SQLite).
+    """
+    points = delete(BacktestPoint)
+    runs = delete(BacktestRun)
+    if ids is not None:
+        points = points.where(BacktestPoint.run_id.in_(ids))
+        runs = runs.where(BacktestRun.id.in_(ids))
+    session.execute(points)
+    result = cast("CursorResult[Any]", session.execute(runs))
     return result.rowcount
 
 

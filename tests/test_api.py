@@ -150,3 +150,76 @@ def test_heavy_endpoints_return_429_when_busy(client, monkeypatch):
     assert client.get("/bots").status_code == 200  # read-only endpoints are never limited
     api.main._HEAVY_JOBS.release()
     assert client.post("/backtests", json=body).status_code == 201
+
+
+ADMIN_KEY = "k" * 32
+RUN_BODY = {"strategy": "buy_and_hold", "tickers": ["AAA"], "start": "2020-01-01", "end": "2021-12-31"}
+
+
+def _admin(key: str | None = ADMIN_KEY) -> dict[str, str]:
+    return {"X-Admin-Token": key} if key else {}
+
+
+def test_deleting_history_is_off_without_a_key(client, monkeypatch):
+    monkeypatch.delenv("QUANTLAB_ADMIN_TOKEN", raising=False)
+    run_id = client.post("/backtests", json=RUN_BODY).json()["id"]
+    assert client.get("/admin/session").json() == {"enabled": False, "authorized": False}
+    res = client.post("/admin/backtests/delete", json={"ids": [run_id]}, headers=_admin())
+    assert res.status_code == 404
+    assert client.get(f"/backtests/{run_id}").status_code == 200
+
+
+def test_a_short_key_does_not_enable_deleting(client, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", "short")
+    assert client.get("/admin/session", headers=_admin("short")).json() == {"enabled": False, "authorized": False}
+    assert client.post("/admin/backtests/delete", json={"delete_all": True}, headers=_admin("short")).status_code == 404
+
+
+def test_session_reports_whether_the_key_is_right(client, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
+    assert client.get("/admin/session").json() == {"enabled": True, "authorized": False}
+    assert client.get("/admin/session", headers=_admin("x" * 32)).json() == {"enabled": True, "authorized": False}
+    assert client.get("/admin/session", headers=_admin()).json() == {"enabled": True, "authorized": True}
+
+
+def test_delete_needs_the_right_key(client, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
+    run_id = client.post("/backtests", json=RUN_BODY).json()["id"]
+    for headers in ({}, _admin("x" * 32)):
+        res = client.post("/admin/backtests/delete", json={"ids": [run_id]}, headers=headers)
+        assert res.status_code == 401
+    assert client.get(f"/backtests/{run_id}").status_code == 200  # still there
+
+
+def test_delete_removes_the_chosen_runs_and_their_curves(client, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
+    first, second, third = (client.post("/backtests", json=RUN_BODY).json()["id"] for _ in range(3))
+    res = client.post("/admin/backtests/delete", json={"ids": [first, third, 999]}, headers=_admin())
+    assert res.status_code == 200
+    assert res.json() == {"deleted": 2}  # the unknown id is ignored
+    assert [r["id"] for r in client.get("/backtests").json()] == [second]
+    assert client.get(f"/backtests/{first}").status_code == 404
+
+    from sqlalchemy import func, select
+
+    from quantlab.db.models import BacktestPoint
+    from quantlab.db.session import session_scope
+
+    with session_scope() as session:
+        left = session.scalar(select(func.count()).select_from(BacktestPoint).where(BacktestPoint.run_id == first))
+    assert left == 0
+
+
+def test_delete_all_empties_the_history(client, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
+    for _ in range(3):
+        client.post("/backtests", json=RUN_BODY)
+    res = client.post("/admin/backtests/delete", json={"delete_all": True}, headers=_admin())
+    assert res.json() == {"deleted": 3}
+    assert client.get("/backtests").json() == []
+
+
+@pytest.mark.parametrize("body", [{}, {"ids": []}, {"ids": ["a"]}, {"ids": list(range(501))}])
+def test_delete_rejects_an_empty_or_oversized_request(client, monkeypatch, body):
+    monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
+    assert client.post("/admin/backtests/delete", json=body, headers=_admin()).status_code == 422

@@ -174,6 +174,20 @@ export const en = {
     maxDd: 'Max DD',
     compareRun: (id: number) => `Compare run ${id}`,
     allRuns: '← All runs',
+    admin: {
+      open: 'Admin',
+      keyLabel: 'Admin key',
+      unlock: 'Unlock',
+      wrongKey: 'That key is not right.',
+      signOut: 'Sign out',
+      delete: 'Delete',
+      deleteRun: (id: number) => `Delete run ${id}`,
+      deleteAll: 'Delete all',
+      confirmAll: 'Delete every saved run?',
+      confirmYes: 'Yes, delete',
+      cancel: 'Cancel',
+      rejected: 'The key was rejected. Sign in again.',
+    },
   },
 
   pairs: {

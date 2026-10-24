@@ -30,6 +30,26 @@ def _check_span(start: date, end: date) -> None:
         raise ValueError("date range is longer than 30 years")
 
 
+class AdminSession(BaseModel):
+    enabled: bool  # a delete key is configured on the server
+    authorized: bool  # the key sent with this request is the right one
+
+
+class DeleteBacktestsRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list, max_length=500)
+    delete_all: bool = False
+
+    @model_validator(mode="after")
+    def need_a_target(self) -> DeleteBacktestsRequest:
+        if not self.delete_all and not self.ids:
+            raise ValueError("give ids or set delete_all")
+        return self
+
+
+class DeleteResult(BaseModel):
+    deleted: int
+
+
 class StrategyInfo(BaseModel):
     name: str
     description: str

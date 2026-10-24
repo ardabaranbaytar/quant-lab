@@ -149,19 +149,26 @@ export interface BotConfig {
 /** `code` marks the errors the UI shows in the visitor's language; other messages come from the server as-is. */
 export class ApiError extends Error {
   code?: 'network' | 'busy'
+  status?: number
 
-  constructor(message: string, code?: 'network' | 'busy') {
+  constructor(message: string, code?: 'network' | 'busy', status?: number) {
     super(message)
     this.code = code
+    this.status = status
   }
+}
+
+export interface AdminSession {
+  enabled: boolean
+  authorized: boolean
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
       ...init,
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
     })
   } catch {
     throw new ApiError('Cannot reach the API. Is the backend running?', 'network')
@@ -180,7 +187,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(message)
+    throw new ApiError(message, undefined, res.status)
   }
   return res.json() as Promise<T>
 }
@@ -196,11 +203,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ tickers, start, end }),
     }),
+  adminSession: (key?: string | null) =>
+    request<AdminSession>('/admin/session', { headers: adminHeader(key) }),
+  deleteBacktests: (key: string, target: { ids: number[] } | { delete_all: true }) =>
+    request<{ deleted: number }>('/admin/backtests/delete', {
+      method: 'POST',
+      body: JSON.stringify(target),
+      headers: adminHeader(key),
+    }),
   bots: () => request<BotSummary[]>('/bots'),
   bot: (name: string) => request<BotStatus>(botPath(name)),
   botEquity: (name: string) => request<BotEquityPoint[]>(botPath(name, '/equity')),
   botFills: (name: string, limit = 500) => request<BotFill[]>(botPath(name, `/fills?limit=${limit}`)),
   botEvents: (name: string, limit = 500) => request<BotEvent[]>(botPath(name, `/events?limit=${limit}`)),
+}
+
+function adminHeader(key?: string | null): Record<string, string> {
+  return key ? { 'X-Admin-Token': key } : {}
 }
 
 function botPath(name: string, suffix = '') {

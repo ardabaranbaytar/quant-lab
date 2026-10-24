@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { PerformanceCharts, type Series } from '../components/PerformanceCharts'
-import { Card, ErrorBanner, Spinner } from '../components/ui'
+import { Button, Card, ErrorBanner, Spinner } from '../components/ui'
 import { useI18n } from '../i18n/context'
-import { api, type BacktestDetail, type BacktestSummary } from '../lib/api'
+import { ApiError, api, type BacktestDetail, type BacktestSummary } from '../lib/api'
+import { loadAdminKey, saveAdminKey } from '../lib/admin'
 
 const MAX_COMPARE = 4
 
@@ -16,8 +17,28 @@ export function HistoryPage() {
   const [slots, setSlots] = useState<Map<number, number>>(new Map())
   const [details, setDetails] = useState<Map<number, BacktestDetail>>(new Map())
 
+  // Deleting is for the owner: the server only offers it when it has a key, and only the right key works.
+  const [adminEnabled, setAdminEnabled] = useState(false)
+  const [adminKey, setAdminKey] = useState<string | null>(null) // set once the server has accepted it
+  const [keyFormOpen, setKeyFormOpen] = useState(false)
+  const [draftKey, setDraftKey] = useState('')
+  const [confirmAll, setConfirmAll] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<Error | null>(null)
+
   useEffect(() => {
     api.backtests().then(setRuns).catch(setError)
+    const saved = loadAdminKey()
+    api
+      .adminSession(saved)
+      .then((session) => {
+        setAdminEnabled(session.enabled)
+        if (session.authorized) setAdminKey(saved)
+        else if (saved) saveAdminKey(null)
+      })
+      .catch(() => {
+        /* the list works without admin; nothing to show */
+      })
   }, [])
 
   const toggle = async (id: number) => {
@@ -42,6 +63,57 @@ export function HistoryPage() {
     }
   }
 
+  const unlock = async (e: FormEvent) => {
+    e.preventDefault()
+    const key = draftKey.trim()
+    if (!key) return
+    setNotice(null)
+    setActionError(null)
+    try {
+      const session = await api.adminSession(key)
+      if (!session.authorized) {
+        setNotice(t.history.admin.wrongKey)
+        return
+      }
+      saveAdminKey(key)
+      setAdminKey(key)
+      setKeyFormOpen(false)
+      setDraftKey('')
+    } catch (err) {
+      setActionError(err as Error)
+    }
+  }
+
+  const signOut = () => {
+    saveAdminKey(null)
+    setAdminKey(null)
+    setConfirmAll(false)
+  }
+
+  const remove = async (target: { ids: number[] } | { delete_all: true }) => {
+    if (!adminKey) return
+    setNotice(null)
+    setActionError(null)
+    try {
+      await api.deleteBacktests(adminKey, target)
+      const without = <V,>(m: Map<number, V>) => {
+        const next = new Map(m)
+        for (const id of 'ids' in target ? target.ids : [...m.keys()]) next.delete(id)
+        return next
+      }
+      setSlots(without)
+      setDetails(without)
+      setRuns(await api.backtests()) // refill the list: older runs may now fit
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        signOut()
+        setNotice(t.history.admin.rejected)
+      } else {
+        setActionError(err as Error)
+      }
+    }
+  }
+
   const series: Series[] = useMemo(
     () =>
       [...slots]
@@ -56,12 +128,86 @@ export function HistoryPage() {
   if (error) return <ErrorBanner error={error} />
   if (!runs) return <Spinner />
 
+  const admin = t.history.admin
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-semibold text-ink">{t.history.title}</h1>
-        <p className="text-sm text-ink-2">{t.history.subtitle(MAX_COMPARE)}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink">{t.history.title}</h1>
+          <p className="text-sm text-ink-2">{t.history.subtitle(MAX_COMPARE)}</p>
+        </div>
+
+        {adminEnabled && (
+          <div className="flex flex-wrap items-center gap-2">
+            {adminKey ? (
+              confirmAll ? (
+                <>
+                  <span className="text-sm text-ink-2">{admin.confirmAll}</span>
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setConfirmAll(false)
+                      void remove({ delete_all: true })
+                    }}
+                  >
+                    {admin.confirmYes}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setConfirmAll(false)}>
+                    {admin.cancel}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => setConfirmAll(true)} disabled={runs.length === 0}>
+                    {admin.deleteAll}
+                  </Button>
+                  <Button variant="ghost" onClick={signOut}>
+                    {admin.signOut}
+                  </Button>
+                </>
+              )
+            ) : keyFormOpen ? (
+              <form onSubmit={unlock} className="flex flex-wrap items-center gap-2">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  autoFocus
+                  aria-label={admin.keyLabel}
+                  placeholder={admin.keyLabel}
+                  value={draftKey}
+                  onChange={(e) => setDraftKey(e.target.value)}
+                  className="!w-56"
+                />
+                <Button type="submit" disabled={!draftKey.trim()}>
+                  {admin.unlock}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setKeyFormOpen(false)
+                    setNotice(null)
+                  }}
+                >
+                  {admin.cancel}
+                </Button>
+              </form>
+            ) : (
+              <Button variant="ghost" onClick={() => setKeyFormOpen(true)}>
+                {admin.open}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
+      {notice && (
+        <div role="alert" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
+          {notice}
+        </div>
+      )}
+      {actionError && <ErrorBanner error={actionError} />}
 
       {series.length > 0 && <PerformanceCharts series={series} title={t.charts.comparison} />}
 
@@ -84,6 +230,7 @@ export function HistoryPage() {
                   <th className="py-2 pr-4 text-right font-medium">{t.history.return}</th>
                   <th className="py-2 pr-4 text-right font-medium">{t.history.sharpe}</th>
                   <th className="py-2 text-right font-medium">{t.history.maxDd}</th>
+                  {adminKey && <th className="w-16 py-2" />}
                 </tr>
               </thead>
               <tbody className="tabular">
@@ -120,6 +267,18 @@ export function HistoryPage() {
                       </td>
                       <td className="py-2 pr-4 text-right text-ink">{f.num(r.metrics.sharpe)}</td>
                       <td className="py-2 text-right text-ink-2">{f.pct(r.metrics.max_drawdown)}</td>
+                      {adminKey && (
+                        <td className="py-2 pl-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => remove({ ids: [r.id] })}
+                            aria-label={admin.deleteRun(r.id)}
+                            className="text-xs text-muted hover:text-critical"
+                          >
+                            {admin.delete}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

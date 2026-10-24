@@ -45,12 +45,14 @@ export function StatTile({ label, value, delta, deltaLabel, higherIsBetter = tru
 }
 
 export function Button({ children, variant = 'primary', className = '', ...props }: {
-  variant?: 'primary' | 'ghost'
+  variant?: 'primary' | 'ghost' | 'danger'
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const styles =
     variant === 'primary'
       ? 'bg-accent text-accent-ink hover:opacity-90 disabled:opacity-50'
-      : 'border border-line text-ink-2 hover:bg-surface-2 hover:text-ink'
+      : variant === 'danger'
+        ? 'bg-critical text-white hover:opacity-90 disabled:opacity-50'
+        : 'border border-line text-ink-2 hover:bg-surface-2 hover:text-ink'
   return (
     <button
       className={`inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed ${styles} ${className}`}
