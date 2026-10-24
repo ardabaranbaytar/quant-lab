@@ -44,6 +44,13 @@ class TickerCheckResponse(BaseModel):
     results: dict[str, bool | None]
 
 
+class SecurityHit(BaseModel):
+    symbol: str
+    name: str
+    kind: str  # "stock" | "etf" | "index"
+    group: str  # sector / category, or the exchange for names found on Yahoo
+
+
 class AdminSession(BaseModel):
     enabled: bool  # a delete key is configured on the server
     authorized: bool  # the key sent with this request is the right one

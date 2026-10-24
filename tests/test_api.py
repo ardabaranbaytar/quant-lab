@@ -312,3 +312,84 @@ def test_ticker_check_memory_is_bounded(client, yahoo, monkeypatch):
 )
 def test_ticker_check_rejects_bad_input(client, yahoo, body):
     assert client.post("/tickers/check", json=body).status_code == 422
+
+
+@pytest.fixture
+def yahoo_search(monkeypatch):
+    """Stands in for Yahoo's name search and records the queries it was asked."""
+    import api.main
+
+    monkeypatch.setattr(api.main, "_SEARCHED", {})
+    asked: list[str] = []
+    answers: dict[str, list[tuple[str, str, str, str]]] = {}
+
+    def fake(query, limit=6):
+        asked.append(query)
+        return answers.get(query, [])[:limit]
+
+    monkeypatch.setattr(quantlab.data, "search_symbols", fake)
+    return answers, asked
+
+
+def test_search_answers_from_the_local_list_without_yahoo(client, yahoo_search):
+    _, asked = yahoo_search
+    res = client.get("/tickers/search", params={"q": "apple", "limit": 1})
+    assert res.status_code == 200
+    assert res.json() == [{"symbol": "AAPL", "name": "Apple Inc.", "kind": "stock", "group": "Information Technology"}]
+    assert asked == []  # the local list already filled the limit
+
+
+def test_search_two_letters_never_goes_to_yahoo(client, yahoo_search):
+    _, asked = yahoo_search
+    assert client.get("/tickers/search", params={"q": "zz"}).json() == []
+    assert asked == []
+
+
+def test_search_falls_back_to_yahoo_for_what_the_list_lacks(client, yahoo_search):
+    answers, asked = yahoo_search
+    answers["thyao"] = [("THYAO.IS", "Turk Hava Yollari", "stock", "IST")]
+    res = client.get("/tickers/search", params={"q": "thyao"})
+    assert res.json() == [{"symbol": "THYAO.IS", "name": "Turk Hava Yollari", "kind": "stock", "group": "IST"}]
+    client.get("/tickers/search", params={"q": "thyao"})
+    assert asked == ["thyao"]  # the second answer came from memory
+
+
+def test_search_does_not_repeat_a_symbol_it_already_has(client, yahoo_search):
+    answers, _ = yahoo_search
+    answers["apple"] = [("AAPL", "Apple Inc.", "stock", "NASDAQ"), ("APLE", "Apple Hospitality REIT", "stock", "NYSE")]
+    symbols = [h["symbol"] for h in client.get("/tickers/search", params={"q": "apple"}).json()]
+    assert symbols.count("AAPL") == 1
+    assert "APLE" in symbols
+
+
+def test_search_survives_yahoo_failing(client, monkeypatch):
+    import api.main
+
+    monkeypatch.setattr(api.main, "_SEARCHED", {})
+
+    def broken(query, limit=6):
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(quantlab.data, "search_symbols", broken)
+    res = client.get("/tickers/search", params={"q": "thyao"})
+    assert res.status_code == 200
+    assert res.json() == []
+    assert api.main._SEARCHED == {}  # a failure is not remembered as "no results"
+
+
+def test_search_skips_yahoo_when_busy(client, yahoo_search, monkeypatch):
+    import threading
+
+    import api.main
+
+    _, asked = yahoo_search
+    busy = threading.BoundedSemaphore(1)
+    busy.acquire()
+    monkeypatch.setattr(api.main, "_CHECK_JOBS", busy)
+    assert client.get("/tickers/search", params={"q": "thyao"}).json() == []
+    assert asked == []
+
+
+@pytest.mark.parametrize("params", [{}, {"q": ""}, {"q": "x" * 41}, {"q": "app", "limit": 0}, {"q": "app", "limit": 16}])
+def test_search_rejects_bad_input(client, params):
+    assert client.get("/tickers/search", params=params).status_code == 422

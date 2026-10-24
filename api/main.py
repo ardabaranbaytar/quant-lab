@@ -36,10 +36,12 @@ from api.schemas import (
     PairScanRequest,
     PairScanResponse,
     Point,
+    SecurityHit,
     StrategyInfo,
     TickerCheckRequest,
     TickerCheckResponse,
 )
+from quantlab import securities
 from quantlab.bot import store as bot_store
 from quantlab.db import init_db, session_scope
 from quantlab.db import repository as repo
@@ -135,6 +137,37 @@ def _lookup_symbols(symbols: list[str]) -> dict[str, bool | None]:
     return {s: s in found for s in symbols}
 
 
+# The picker searches our own list first. Yahoo is only asked about what that list lacks (other
+# exchanges, small caps), through the same cap as the existence check, and answers are remembered.
+_YAHOO_SEARCH_MIN_CHARS = 3
+_SEARCHED: dict[str, tuple[list[SecurityHit], float]] = {}  # folded query -> (hits, valid until)
+_SEARCH_TTL = 3600.0
+_SEARCH_CACHE_MAX = 500
+
+
+def _yahoo_hits(query: str, limit: int) -> list[SecurityHit]:
+    from quantlab.data import search_symbols
+
+    key = securities.fold(query)
+    cached = _SEARCHED.get(key)
+    if cached and cached[1] > time.monotonic():
+        return cached[0][:limit]
+    if not _CHECK_JOBS.acquire(blocking=False):
+        return []
+    try:
+        found = search_symbols(query, limit=6)
+    except Exception:  # Yahoo down, throttled, or no Search in this yfinance: the local list still answers
+        log.warning("symbol search failed for %r", query, exc_info=True)
+        return []
+    finally:
+        _CHECK_JOBS.release()
+    hits = [SecurityHit(symbol=s, name=n, kind=k, group=g) for s, n, k, g in found]
+    _SEARCHED[key] = (hits, time.monotonic() + _SEARCH_TTL)
+    while len(_SEARCHED) > _SEARCH_CACHE_MAX:
+        _SEARCHED.pop(next(iter(_SEARCHED)))
+    return hits[:limit]
+
+
 def _strategy_params(fn) -> dict:
     sig = inspect.signature(fn)
     return {
@@ -194,6 +227,22 @@ def check_tickers(req: TickerCheckRequest, session: SessionDep):
     if unknown:
         results.update(_lookup_symbols(unknown))
     return TickerCheckResponse(results={s: results[s] for s in req.symbols})
+
+
+@app.get("/tickers/search", response_model=list[SecurityHit])
+def search_tickers(
+    q: Annotated[str, Query(min_length=1, max_length=40)],
+    limit: Annotated[int, Query(ge=1, le=15)] = 8,
+):
+    hits = [
+        SecurityHit(symbol=s.symbol, name=s.name, kind=s.kind, group=s.group)
+        for s in securities.search(q, limit)
+    ]
+    query = q.strip()
+    if len(hits) < limit and len(query) >= _YAHOO_SEARCH_MIN_CHARS:
+        have = {h.symbol for h in hits}
+        hits += [h for h in _yahoo_hits(query, limit) if h.symbol not in have][: limit - len(hits)]
+    return hits
 
 
 @app.get("/strategies", response_model=list[StrategyInfo])

@@ -158,6 +158,14 @@ export class ApiError extends Error {
   }
 }
 
+export interface SecurityHit {
+  symbol: string
+  name: string
+  kind: 'stock' | 'etf' | 'index'
+  /** Sector or category; the exchange for names found only on Yahoo. */
+  group: string
+}
+
 export interface AdminSession {
   enabled: boolean
   authorized: boolean
@@ -203,6 +211,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ tickers, start, end }),
     }),
+  searchTickers: (query: string) =>
+    request<SecurityHit[]>(`/tickers/search?q=${encodeURIComponent(query)}`),
   /** Which symbols have price history: true, false (unknown to Yahoo), or null (could not tell). */
   checkTickers: (symbols: string[]) =>
     request<{ results: Record<string, boolean | null> }>('/tickers/check', {

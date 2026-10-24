@@ -59,6 +59,26 @@ def symbols_with_history(symbols: list[str]) -> set[str]:
     return {str(c) for c in close.columns if close[c].notna().any()}
 
 
+def search_symbols(query: str, limit: int = 6) -> list[tuple[str, str, str, str]]:
+    """Yahoo's symbol search: ``(symbol, name, kind, exchange)`` for stocks, ETFs and indices.
+
+    Futures, crypto and funds are dropped: the backtester needs ordinary daily closes.
+    Raises if Yahoo cannot be reached (or this yfinance has no ``Search``).
+    """
+    import yfinance as yf
+
+    kinds = {"EQUITY": "stock", "ETF": "etf", "INDEX": "index"}
+    quotes = yf.Search(query, max_results=limit * 2, news_count=0).quotes
+    hits = []
+    for quote in quotes:
+        kind = kinds.get(quote.get("quoteType", ""))
+        symbol = str(quote.get("symbol", "")).upper()
+        if kind and symbol:
+            name = quote.get("longname") or quote.get("shortname") or symbol
+            hits.append((symbol, str(name), kind, str(quote.get("exchDisp") or "")))
+    return hits[:limit]
+
+
 def load_prices(
     tickers: Iterable[str],
     start: str,
