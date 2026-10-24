@@ -10,8 +10,20 @@ export const STORAGE_KEY = 'lang'
 
 const isLocale = (v: unknown): v is Locale => LOCALES.some((l) => l.code === v)
 
-/** Saved choice first, then the browser's language list, then English. */
+/**
+ * A `?lang=` link (the portfolio site passes its own language) first, then the saved choice,
+ * then the browser's language list, then English.
+ */
 export function detectLocale(): Locale {
+  const linked = new URLSearchParams(location.search).get('lang')
+  if (isLocale(linked)) {
+    try {
+      localStorage.setItem(STORAGE_KEY, linked)
+    } catch {
+      /* storage unavailable */
+    }
+    return linked
+  }
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (isLocale(saved)) return saved
