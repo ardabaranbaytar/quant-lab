@@ -41,6 +41,24 @@ def _download_close(tickers: list[str], start: str, end: str) -> pd.DataFrame:
     return pd.concat(frames, axis=1)
 
 
+def symbols_with_history(symbols: list[str]) -> set[str]:
+    """Which of ``symbols`` Yahoo knows: those with any close in their whole history.
+
+    Monthly bars keep the download small. "Any history" rather than "recent data" on purpose:
+    delisted names still count, since a backtest over past dates is legitimate for them.
+    Raises if Yahoo cannot be reached, so callers can tell "unknown symbol" from "no answer".
+    """
+    import yfinance as yf
+
+    raw = yf.download(symbols, period="max", interval="1mo", auto_adjust=True, progress=False)
+    if raw.empty:
+        return set()
+    close = raw["Close"]
+    if isinstance(close, pd.Series):
+        close = close.to_frame(symbols[0])
+    return {str(c) for c in close.columns if close[c].notna().any()}
+
+
 def load_prices(
     tickers: Iterable[str],
     start: str,

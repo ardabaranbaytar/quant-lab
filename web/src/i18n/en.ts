@@ -39,6 +39,9 @@ export const en = {
     tickerExample: 'e.g. AAPL, MSFT',
     addTicker: 'Add ticker',
     removeTicker: (ticker: string) => `Remove ${ticker}`,
+    checkingTicker: 'Checking…',
+    tickerNotFound: (list: string) => `No price data found for ${list}`,
+    tickerBadFormat: (list: string) => `Not a valid ticker: ${list}`,
     benchmark: 'SPY (buy & hold)',
   },
 

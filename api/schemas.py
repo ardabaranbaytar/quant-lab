@@ -30,6 +30,20 @@ def _check_span(start: date, end: date) -> None:
         raise ValueError("date range is longer than 30 years")
 
 
+class TickerCheckRequest(BaseModel):
+    symbols: list[str] = Field(min_length=1, max_length=50)
+
+    @field_validator("symbols")
+    @classmethod
+    def normalise_symbols(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(_ticker(s) for s in v))
+
+
+class TickerCheckResponse(BaseModel):
+    # symbol -> True (has price history), False (Yahoo does not know it), None (could not tell)
+    results: dict[str, bool | None]
+
+
 class AdminSession(BaseModel):
     enabled: bool  # a delete key is configured on the server
     authorized: bool  # the key sent with this request is the right one

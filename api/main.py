@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import hmac
 import inspect
+import logging
 import math
 import os
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -35,6 +37,8 @@ from api.schemas import (
     PairScanResponse,
     Point,
     StrategyInfo,
+    TickerCheckRequest,
+    TickerCheckResponse,
 )
 from quantlab.bot import store as bot_store
 from quantlab.db import init_db, session_scope
@@ -43,6 +47,8 @@ from quantlab.engine import ffill_within_life, run_backtest
 from quantlab.metrics import drawdown, performance_summary
 from quantlab.research.pairs import scan_pairs
 from quantlab.strategies import STRATEGIES
+
+log = logging.getLogger(__name__)
 
 MIN_TICKERS = {"pairs_trading": 2}
 INTERNAL_PARAMS = {"universe", "break_monitor"}  # set server-side, not user-editable
@@ -93,6 +99,42 @@ def heavy_slot() -> Iterator[None]:
         _HEAVY_JOBS.release()
 
 
+# "Does this symbol exist?" is asked while the visitor types, and anything we have not stored yet
+# costs a Yahoo lookup. So: its own small concurrency cap (busy means "could not tell", never an
+# error), and answers are remembered for a while in a bounded cache, so a retyped typo is free.
+_CHECK_JOBS = threading.BoundedSemaphore(int(os.getenv("QUANTLAB_MAX_CHECK_JOBS", "2")))
+_CHECK_TTL_FOUND = 24 * 3600.0
+_CHECK_TTL_MISSING = 3600.0
+_CHECK_CACHE_MAX = 2000
+_CHECKED: dict[str, tuple[bool, float]] = {}  # symbol -> (exists, valid until)
+
+
+def _remember_symbols(found: set[str], asked: list[str]) -> None:
+    now = time.monotonic()
+    for sym in asked:
+        exists = sym in found
+        _CHECKED[sym] = (exists, now + (_CHECK_TTL_FOUND if exists else _CHECK_TTL_MISSING))
+    while len(_CHECKED) > _CHECK_CACHE_MAX:
+        _CHECKED.pop(next(iter(_CHECKED)))  # oldest first: dicts keep insertion order
+
+
+def _lookup_symbols(symbols: list[str]) -> dict[str, bool | None]:
+    """Ask Yahoo about symbols we cannot answer ourselves; None where it did not answer."""
+    from quantlab.data import symbols_with_history
+
+    if not _CHECK_JOBS.acquire(blocking=False):
+        return dict.fromkeys(symbols)
+    try:
+        found = symbols_with_history(symbols)
+    except Exception:  # Yahoo down, throttled or changed: "could not tell" must not block typing
+        log.warning("ticker check failed for %s", symbols, exc_info=True)
+        return dict.fromkeys(symbols)
+    finally:
+        _CHECK_JOBS.release()
+    _remember_symbols(found, symbols)
+    return {s: s in found for s in symbols}
+
+
 def _strategy_params(fn) -> dict:
     sig = inspect.signature(fn)
     return {
@@ -133,6 +175,25 @@ def _with_benchmark(session: Session, run) -> BacktestDetail:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.post("/tickers/check", response_model=TickerCheckResponse)
+def check_tickers(req: TickerCheckRequest, session: SessionDep):
+    stored = set(repo.price_coverage(session, req.symbols))
+    now = time.monotonic()
+    results: dict[str, bool | None] = {}
+    unknown: list[str] = []
+    for sym in req.symbols:
+        cached = _CHECKED.get(sym)
+        if sym in stored:
+            results[sym] = True
+        elif cached and cached[1] > now:
+            results[sym] = cached[0]
+        else:
+            unknown.append(sym)
+    if unknown:
+        results.update(_lookup_symbols(unknown))
+    return TickerCheckResponse(results={s: results[s] for s in req.symbols})
 
 
 @app.get("/strategies", response_model=list[StrategyInfo])

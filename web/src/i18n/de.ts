@@ -23,6 +23,9 @@ export const de: Messages = {
     tickerExample: 'z. B. AAPL, MSFT',
     addTicker: 'Ticker hinzufügen',
     removeTicker: (ticker) => `${ticker} entfernen`,
+    checkingTicker: 'Prüfe…',
+    tickerNotFound: (list) => `Keine Kursdaten gefunden für ${list}`,
+    tickerBadFormat: (list) => `Kein gültiger Ticker: ${list}`,
     benchmark: 'SPY (Buy & Hold)',
   },
 

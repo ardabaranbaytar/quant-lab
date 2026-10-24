@@ -25,6 +25,9 @@ export const tr: Messages = {
     tickerExample: 'örn. AAPL, MSFT',
     addTicker: 'Hisse kodu ekle',
     removeTicker: (ticker) => `${ticker} kodunu kaldır`,
+    checkingTicker: 'Kontrol ediliyor…',
+    tickerNotFound: (list) => `${list} için fiyat verisi bulunamadı`,
+    tickerBadFormat: (list) => `Geçerli bir hisse kodu değil: ${list}`,
     benchmark: 'SPY (al ve tut)',
   },
 

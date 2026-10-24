@@ -223,3 +223,92 @@ def test_delete_all_empties_the_history(client, monkeypatch):
 def test_delete_rejects_an_empty_or_oversized_request(client, monkeypatch, body):
     monkeypatch.setenv("QUANTLAB_ADMIN_TOKEN", ADMIN_KEY)
     assert client.post("/admin/backtests/delete", json=body, headers=_admin()).status_code == 422
+
+
+@pytest.fixture
+def yahoo(monkeypatch):
+    """Stands in for Yahoo's "which of these symbols exist?" and records every question."""
+    import api.main
+
+    monkeypatch.setattr(api.main, "_CHECKED", {})
+    asked: list[list[str]] = []
+    known: set[str] = set()
+
+    def fake(symbols):
+        asked.append(list(symbols))
+        return {s for s in symbols if s in known}
+
+    monkeypatch.setattr(quantlab.data, "symbols_with_history", fake)
+    return known, asked
+
+
+def test_ticker_check_trusts_stored_prices_without_asking_yahoo(client, yahoo):
+    _, asked = yahoo
+    client.post("/backtests", json=RUN_BODY)  # stores AAA prices
+    res = client.post("/tickers/check", json={"symbols": ["aaa"]})
+    assert res.json() == {"results": {"AAA": True}}
+    assert asked == []
+
+
+def test_ticker_check_asks_yahoo_about_the_rest_and_remembers(client, yahoo):
+    known, asked = yahoo
+    known.add("NEWCO")
+    body = {"symbols": ["NEWCO", "DDDDD"]}
+    expected = {"results": {"NEWCO": True, "DDDDD": False}}
+    assert client.post("/tickers/check", json=body).json() == expected
+    assert client.post("/tickers/check", json=body).json() == expected
+    assert asked == [["NEWCO", "DDDDD"]]  # the second answer came from memory
+
+
+def test_ticker_check_asks_again_once_an_answer_has_expired(client, yahoo):
+    import api.main
+
+    _, asked = yahoo
+    client.post("/tickers/check", json={"symbols": ["DDDDD"]})
+    api.main._CHECKED["DDDDD"] = (False, 0.0)  # long past
+    client.post("/tickers/check", json={"symbols": ["DDDDD"]})
+    assert len(asked) == 2
+
+
+def test_ticker_check_says_unknown_when_yahoo_does_not_answer(client, monkeypatch):
+    import api.main
+
+    monkeypatch.setattr(api.main, "_CHECKED", {})
+
+    def broken(symbols):
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(quantlab.data, "symbols_with_history", broken)
+    res = client.post("/tickers/check", json={"symbols": ["DDDDD"]})
+    assert res.status_code == 200
+    assert res.json() == {"results": {"DDDDD": None}}
+    assert api.main._CHECKED == {}  # a failure is not remembered as "does not exist"
+
+
+def test_ticker_check_says_unknown_when_busy(client, yahoo, monkeypatch):
+    import threading
+
+    import api.main
+
+    _, asked = yahoo
+    busy = threading.BoundedSemaphore(1)
+    busy.acquire()
+    monkeypatch.setattr(api.main, "_CHECK_JOBS", busy)
+    assert client.post("/tickers/check", json={"symbols": ["DDDDD"]}).json() == {"results": {"DDDDD": None}}
+    assert asked == []
+
+
+def test_ticker_check_memory_is_bounded(client, yahoo, monkeypatch):
+    import api.main
+
+    monkeypatch.setattr(api.main, "_CHECK_CACHE_MAX", 3)
+    client.post("/tickers/check", json={"symbols": [f"X{i}" for i in range(5)]})
+    assert list(api.main._CHECKED) == ["X2", "X3", "X4"]  # the oldest answers went first
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"symbols": []}, {"symbols": ["bad symbol!"]}, {"symbols": ["A" * 40]}, {"symbols": [f"A{i}" for i in range(51)]}],
+)
+def test_ticker_check_rejects_bad_input(client, yahoo, body):
+    assert client.post("/tickers/check", json=body).status_code == 422

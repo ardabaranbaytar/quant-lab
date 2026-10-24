@@ -203,6 +203,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ tickers, start, end }),
     }),
+  /** Which symbols have price history: true, false (unknown to Yahoo), or null (could not tell). */
+  checkTickers: (symbols: string[]) =>
+    request<{ results: Record<string, boolean | null> }>('/tickers/check', {
+      method: 'POST',
+      body: JSON.stringify({ symbols }),
+    }),
   adminSession: (key?: string | null) =>
     request<AdminSession>('/admin/session', { headers: adminHeader(key) }),
   deleteBacktests: (key: string, target: { ids: number[] } | { delete_all: true }) =>
