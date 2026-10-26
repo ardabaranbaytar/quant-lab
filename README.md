@@ -4,27 +4,36 @@
 
 Portfolio-level backtesting, factor research and a statistical-arbitrage paper-trading bot — one codebase, from research notebook to deployed app.
 
-> Work in progress. Consolidates four earlier research repos
-> (multi-strategy framework, momentum, pairs trading, factor research).
+**Live demo:** [quant.ardabaranbaytar.com](https://quant.ardabaranbaytar.com) (English, Turkish, German) ·
+**Author:** [ardabaranbaytar.com](https://ardabaranbaytar.com) ·
+**Companion project:** [StochOpt-MDP](https://github.com/ardabaranbaytar/StochOpt-MDP)
 
-## Status
+**In plain words.** This project tests trading ideas on historical stock prices *honestly*, then runs one
+strategy forward every trading day with simulated money as a real out-of-sample test. The main finding is a
+negative one, and that is the point: ideas that look great in tutorials stop working once hidden advantages
+(such as knowing today's winners in advance) are removed and realistic trading costs are charged.
 
-- [x] `quantlab` core: data cache, portfolio-weight backtest engine, metrics
-- [x] Strategies: buy & hold, time-series momentum, mean reversion, cross-sectional momentum, pairs trading
-- [x] Research: rank IC, quantile spreads, pair scanning (cointegration, half-life)
-- [x] Walk-forward / out-of-sample validation
-- [x] MySQL storage + FastAPI
-- [x] React dashboard (backtest, run history & comparison, pair scanner), in English, Turkish and German
-- [x] Ticker picker: search by company name or symbol (S&P 500 list in `quantlab/securities.csv`, refresh with `python -m quantlab.securities`; other names from Yahoo)
-- [x] Point-in-time S&P 500 universe + delisting-aware engine
-- [x] Break lab: synthetic pairs with known breaks + 7-detector break monitor
-- [x] Real-world break case studies ([report](reports/case_studies.md))
-- [x] Multi-pair portfolio with quarterly re-selection ([report](reports/pair_portfolio.md))
-- [x] ML entry filter, purged walk-forward + placebo ([report](reports/ml_filter.md))
-- [x] Avellaneda-Lee residual stat-arb, ETF pairs, turnover tuning with a locked hold-out ([report](reports/al_tuning.md))
-- [x] Stat-arb paper-trading bot: paper broker, daily loop, SQL persistence, CLI, read-only API ([design](docs/paper_bot.md))
-- [x] Bot dashboard page: equity curve, open book, fills, BreakMonitor events
-- [x] CI (GitHub Actions: ruff, bandit, mypy, pytest, web lint + build) and daily bot scheduling (Actions cron, systemd timer or Windows Task Scheduler — [deploy/](deploy/))
+It consolidates four earlier research repos (multi-strategy framework, momentum, pairs trading, factor
+research), which are now archived.
+
+## What's inside
+
+- `quantlab` core: data cache, portfolio-weight backtest engine, metrics
+- Strategies: buy & hold, time-series momentum, mean reversion, cross-sectional momentum, pairs trading
+- Research: rank IC, quantile spreads, pair scanning (cointegration, half-life)
+- Walk-forward / out-of-sample validation
+- MySQL storage + FastAPI
+- React dashboard (backtest, run history & comparison, pair scanner), in English, Turkish and German
+- Ticker picker: search by company name or symbol (S&P 500 list in `quantlab/securities.csv`, refresh with `python -m quantlab.securities`; other names from Yahoo)
+- Point-in-time S&P 500 universe + delisting-aware engine
+- Break lab: synthetic pairs with known breaks + 7-detector break monitor
+- Real-world break case studies ([report](reports/case_studies.md))
+- Multi-pair portfolio with quarterly re-selection ([report](reports/pair_portfolio.md))
+- ML entry filter, purged walk-forward + placebo ([report](reports/ml_filter.md))
+- Avellaneda-Lee residual stat-arb, ETF pairs, turnover tuning with a locked hold-out ([report](reports/al_tuning.md))
+- Stat-arb paper-trading bot: paper broker, daily loop, SQL persistence, CLI, read-only API ([design](docs/paper_bot.md))
+- Bot dashboard page: equity curve, open book, fills, BreakMonitor events
+- CI (GitHub Actions: ruff, bandit, mypy, pytest, web lint + build); the daily bot runs on a systemd timer on the live server (an Actions cron and Windows Task Scheduler work too — [deploy/](deploy/))
 
 ## Design
 
@@ -109,9 +118,7 @@ on large caps, none of the classic stat-arb approaches survives costs
 out-of-sample — the tuned result would have looked like a success without the
 hold-out.
 
-**Look-ahead in pairs trading.**
-
-The original V–MA pairs backtest estimated its hedge ratio on the full sample
+**Look-ahead in pairs trading.** The original V–MA pairs backtest estimated its hedge ratio on the full sample
 (look-ahead bias) and reported **+86.8%**. With a rolling 252-day hedge ratio
 frozen per trade, the same rules return **−11.0%** over 2015–2024. Fixing
 this bias is the starting point for the stat-arb bot.
@@ -124,7 +131,9 @@ close fill at the **next** close; pairs are re-selected quarterly from the
 point-in-time S&P 500; the break monitor gates entries and forces exits. Bot and
 backtest share one decision function, and a parity test replays history
 through the bot and requires the backtest's positions exactly. Given the
-research above, this is an out-of-sample test, not a profit engine.
+research above, this is an out-of-sample test, not a profit engine. Its equity
+curve, open positions and fills are public on the live dashboard's
+[Paper bot page](https://quant.ardabaranbaytar.com/bots).
 
 ```bash
 python -m quantlab.bot run --name sp500-pairs     # idempotent; schedule after the US close
@@ -151,7 +160,7 @@ cd web && npm install && npm run dev         # http://localhost:5173
 
 Deploying to a VPS next to the other apps under ardabaranbaytar.com (Caddy + systemd + MySQL, one script per app): [docs/deploy.md](docs/deploy.md).
 
-Tests use synthetic data only (no network) and include explicit look-ahead
+The 140+ tests use synthetic data only (no network) and include explicit look-ahead
 checks: perturbing future prices must never change past weights.
 
 *Educational and research use only. Not investment advice.*
