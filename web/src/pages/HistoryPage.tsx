@@ -215,7 +215,7 @@ export function HistoryPage() {
         {runs.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted">
             {t.history.noRuns}
-            <Link to="/" className="text-accent hover:underline">{t.history.firstRun}</Link>
+            <Link to="/backtest" className="text-accent hover:underline">{t.history.firstRun}</Link>
           </p>
         ) : (
           <div className="overflow-x-auto">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useI18n } from '../i18n/context'
 import { LanguageSwitcher } from './LanguageSwitcher'
 
@@ -29,11 +29,13 @@ function ThemeToggle() {
 
 export function Layout() {
   const { t } = useI18n()
+  const { pathname } = useLocation()
+  // The paper bot is the home page; a second bot lives under /bots/<name> and keeps this tab lit.
   const nav = [
-    { to: '/', label: t.nav.backtest, end: true },
-    { to: '/history', label: t.nav.history, end: false },
-    { to: '/pairs', label: t.nav.pairs, end: false },
-    { to: '/bots', label: t.nav.bot, end: false },
+    { to: '/', label: t.nav.bot, active: pathname === '/' || pathname.startsWith('/bots') },
+    { to: '/backtest', label: t.nav.backtest },
+    { to: '/pairs', label: t.nav.pairs },
+    { to: '/history', label: t.nav.history },
   ]
 
   return (
@@ -52,10 +54,10 @@ export function Layout() {
               <NavLink
                 key={n.to}
                 to={n.to}
-                end={n.end}
+                end={n.to === '/'}
                 className={({ isActive }) =>
                   `whitespace-nowrap rounded-md px-3 py-1.5 transition ${
-                    isActive ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'
+                    (n.active ?? isActive) ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'
                   }`
                 }
               >

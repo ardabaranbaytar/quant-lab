@@ -133,7 +133,7 @@ backtest share one decision function, and a parity test replays history
 through the bot and requires the backtest's positions exactly. Given the
 research above, this is an out-of-sample test, not a profit engine. Its equity
 curve, open positions and fills are public on the live dashboard's
-[Paper bot page](https://quant.ardabaranbaytar.com/bots).
+[Paper bot page](https://quant.ardabaranbaytar.com/), the dashboard's home page.
 
 ```bash
 python -m quantlab.bot run --name sp500-pairs     # idempotent; schedule after the US close

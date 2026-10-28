@@ -142,7 +142,7 @@ export function PairsPage() {
                           {r.half_life == null ? '∞' : t.pairs.days(f.num(r.half_life, 0))}
                         </td>
                         <td className="py-2 text-right">
-                          <Link to={`/?${q}`} className="whitespace-nowrap text-xs text-accent hover:underline">
+                          <Link to={`/backtest?${q}`} className="whitespace-nowrap text-xs text-accent hover:underline">
                             {t.pairs.backtestOos}
                           </Link>
                         </td>
